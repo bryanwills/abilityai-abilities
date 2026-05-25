@@ -20,6 +20,7 @@ Create new Claude Code agents with domain-specific wizards or from scratch.
 /create-agent:receptionist        # Email gateway agent
 /create-agent:ghostwriter         # Content writer agent
 /create-agent:kb-agent            # Knowledge-base agent
+/create-agent:doctor              # Personal medical-records agent
 /create-agent:custom              # Blank canvas agent
 /create-agent:clone               # Clone existing agent
 /create-agent:adjust              # Modify existing agent
@@ -38,6 +39,7 @@ Create new Claude Code agents with domain-specific wizards or from scratch.
 | **receptionist** | Email gateway agent for public-facing communication and request routing |
 | **ghostwriter** | Content writer agent that learns your brand voice and writes for multiple platforms |
 | **kb-agent** | Knowledge-base agent for community management, CS research, clinical, legal, or personal KB |
+| **doctor** | Personal medical-records agent — ingests health documents, tracks lab trends, prepares doctor visits, flags drug-supplement interactions |
 
 ### Generic Tools
 

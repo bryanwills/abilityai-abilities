@@ -13,7 +13,7 @@
       "source": "./plugins/create-agent",
       "description": "Create new Claude Code agents — domain-specific wizards or custom. Consolidates all install-* wizards.",
       "category": "onboarding",
-      "tags": ["agent", "create", "wizard", "onboarding", "scaffold", "prospector", "chiefofstaff", "webmaster", "recon", "receptionist", "ghostwriter", "kb-agent"],
+      "tags": ["agent", "create", "wizard", "onboarding", "scaffold", "prospector", "chiefofstaff", "webmaster", "recon", "receptionist", "ghostwriter", "kb-agent", "doctor", "health", "medical"],
       "skills": [
         "./skills/create",
         "./skills/prospector",
@@ -24,6 +24,7 @@
         "./skills/receptionist",
         "./skills/ghostwriter",
         "./skills/kb-agent",
+        "./skills/doctor",
         "./skills/custom",
         "./skills/clone",
         "./skills/adjust"

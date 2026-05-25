@@ -65,6 +65,7 @@ All agent creation wizards are consolidated into the **create-agent** plugin. Us
 | **receptionist** | `/create-agent:receptionist` | Email gateway — public-facing email communication and request routing |
 | **ghostwriter** | `/create-agent:ghostwriter` | Content writer — brand voice profiles, platform-specific writing |
 | **kb-agent** | `/create-agent:kb-agent` | Knowledge-base agent — Cornelius-shaped KB with local vector search |
+| **doctor** | `/create-agent:doctor` | Personal medical-records agent — ingests health documents, tracks lab trends, preps doctor visits |
 | **website** | `/create-agent:website` | Single website scaffold (no agent, just a site) |
 | **custom** | `/create-agent:custom` | Custom agent from scratch — you define everything |
 | **clone** | `/create-agent:clone` | Clone an existing agent repository as starting point |
@@ -99,6 +100,7 @@ Create new Claude Code agents with domain-specific wizards or from scratch.
 | `/create-agent:receptionist` | Email gateway agent |
 | `/create-agent:ghostwriter` | Content writer agent |
 | `/create-agent:kb-agent` | Knowledge-base agent |
+| `/create-agent:doctor` | Personal medical-records agent |
 | `/create-agent:website` | Single website (no agent) |
 | `/create-agent:custom` | Blank canvas agent |
 | `/create-agent:clone` | Clone existing agent |

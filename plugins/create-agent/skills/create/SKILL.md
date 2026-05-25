@@ -29,6 +29,7 @@ All wizards are skills within this plugin. Use `/create-agent:[wizard-name]` to 
 | **receptionist** | Email gateway agent for public-facing communication | `/create-agent:receptionist` |
 | **ghostwriter** | Content writer agent that knows your brand voice | `/create-agent:ghostwriter` |
 | **kb-agent** | Knowledge-base agent (community manager, CS researcher, clinical, legal, personal) | `/create-agent:kb-agent` |
+| **doctor** | Personal medical-records agent — ingests health documents, tracks lab trends, preps doctor visits | `/create-agent:doctor` |
 | **custom** | Blank canvas agent — you define everything | `/create-agent:custom` |
 | **clone** | Clone an existing agent repository as starting point | `/create-agent:clone` |
 | **adjust** | Modify an existing agent's identity and focus | `/create-agent:adjust` |
@@ -53,8 +54,9 @@ Use AskUserQuestion:
   5. **Email gateway (receptionist)** — Public-facing email communication and request routing
   6. **Content writer (ghostwriter)** — Brand-aware writing for multiple platforms
   7. **Knowledge base (kb-agent)** — Domain knowledge management with Zettelkasten structure
-  8. **Custom from scratch** — Blank canvas, you define everything
-  9. **Clone existing agent** — Start from a working agent as template
+  8. **Personal medical records (doctor)** — Ingest health documents, track lab trends, prep doctor visits for one individual
+  9. **Custom from scratch** — Blank canvas, you define everything
+  10. **Clone existing agent** — Start from a working agent as template
 
 ### Step 3: Launch
 
