@@ -1,5 +1,5 @@
 ---
-name: deploy
+name: deploy-new-instance
 description: Deploy a Trinity instance on any server and scaffold a complete ops agent to manage it — handles fresh installs and existing instances
 argument-hint: "[instance-name]"
 disable-model-invocation: false

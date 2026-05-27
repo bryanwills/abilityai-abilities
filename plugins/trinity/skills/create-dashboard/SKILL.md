@@ -1,3 +1,15 @@
+---
+name: create-dashboard
+description: Generate an agent-specific `/update-dashboard` skill that keeps `dashboard.yaml` current for Trinity. Analyzes the agent's purpose and data sources, proposes metrics, gets user approval, then scaffolds a schedulable skill.
+disable-model-invocation: false
+user-invocable: true
+allowed-tools: Read, Write, Glob, Bash, AskUserQuestion
+metadata:
+  version: "1.0"
+  created: 2026-05-27
+  author: Ability.ai
+---
+
 # /trinity:create-dashboard
 
 Generate an agent-specific `/update-dashboard` skill that keeps `dashboard.yaml` current for Trinity. Analyzes the agent's purpose and data sources, proposes metrics, gets user approval, then creates a schedulable skill.

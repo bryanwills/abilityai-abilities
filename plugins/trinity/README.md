@@ -11,7 +11,7 @@ Set up, connect, deploy, and sync Claude Code agents to the Trinity Deep Agent O
 ## Usage
 
 ```
-/trinity:deploy               # Set up a Trinity instance + create an ops agent to manage it
+/trinity:deploy-new-instance  # Set up a Trinity instance + create an ops agent to manage it
 /trinity:connect              # One-time: authenticate and configure MCP
 /trinity:onboard              # Per-agent: make compatible and deploy
 /trinity:sync                 # Ongoing: sync changes between local and remote
@@ -22,7 +22,7 @@ Set up, connect, deploy, and sync Claude Code agents to the Trinity Deep Agent O
 
 | Skill | Description |
 |-------|-------------|
-| **deploy** | Deploy Trinity on any server (or connect to existing) and scaffold a full ops agent |
+| **deploy-new-instance** | Deploy Trinity on any server (or connect to existing) and scaffold a full ops agent |
 | **connect** | Authenticate with Trinity instance, configure MCP server connection |
 | **onboard** | Full onboarding flow — compatibility check, file creation, deploy to remote |
 | **sync** | Synchronize local/remote changes, supports multiple remotes |
@@ -32,11 +32,11 @@ Set up, connect, deploy, and sync Claude Code agents to the Trinity Deep Agent O
 
 ### 0. Deploy Trinity (if you don't have an instance yet)
 
-Run `/trinity:deploy` to set up a Trinity instance and create an ops agent:
+Run `/trinity:deploy-new-instance` to set up a Trinity instance and create an ops agent:
 - Choose cloud (ability.ai) or self-hosted (remote SSH or local Docker)
 - For fresh installs: generates secrets, configures `.env`, runs `start.sh`, verifies health
 - Handles firewall/security group guidance for AWS, GCP, Hetzner, DigitalOcean
-- Scaffolds a complete ops agent with 6 skills: `/status`, `/restart`, `/update`, `/backup`, `/monitor`, `/logs`
+- Scaffolds a complete ops agent with 11 skills: `/status`, `/restart`, `/update`, `/logs`, `/agents`, `/cleanup`, `/diagnose`, `/rebuild-agent`, `/rollback`, `/telemetry`, `/provision`
 - Works with any SSH-accessible server — provider-agnostic
 
 ### 1. Connect (One-time)

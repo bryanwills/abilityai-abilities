@@ -59,7 +59,8 @@
         "./skills/connect",
         "./skills/onboard",
         "./skills/sync",
-        "./skills/create-dashboard"
+        "./skills/create-dashboard",
+        "./skills/deploy-new-instance"
       ]
     },
     {

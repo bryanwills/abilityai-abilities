@@ -1,3 +1,15 @@
+---
+name: connect
+description: Connect to a Trinity instance and configure MCP server. Authenticates via email OTP, provisions an MCP API key, and writes `.mcp.json` — no CLI installation required.
+disable-model-invocation: false
+user-invocable: true
+allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
+metadata:
+  version: "1.0"
+  created: 2026-05-27
+  author: Ability.ai
+---
+
 # /trinity:connect
 
 Connect to a Trinity instance and configure MCP server. No CLI installation required.
