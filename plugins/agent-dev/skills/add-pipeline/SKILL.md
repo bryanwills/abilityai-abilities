@@ -29,7 +29,7 @@ Add a long-running, multi-stage **pipeline** to any Trinity-compatible agent. Im
 | `.claude/skills/pipeline-resume/` | agent repo | operator resume |
 | `~/.trinity/pipelines/<slug>.yaml` | user home | write-through copy — Trinity's read surface |
 | `~/.trinity/pipeline-state/<slug>/` | user home | per-instance state, read by dashboards and other agents |
-| `~/.trinity/pre-check` | user home | advisory marker — emits a reason when pipeline-tick has work, always fires the schedule otherwise (see Step 6 for why) |
+| `~/.trinity/pre-check` | user home | heartbeat gate — always emits `fire` so every schedule runs; never emits a message override (see Step 6 for why) |
 | `dashboard.yaml` panel | agent repo (if present) | Trinity UI shows a row per instance |
 | heartbeat schedule | Trinity MCP (if available) | `pipeline-<slug>-heartbeat` cron `*/15 * * * *` |
 
@@ -162,9 +162,14 @@ date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.trinity/pipelines/$SLUG.last_synced"
 
 ### Step 6: Extend ~/.trinity/pre-check
 
-The pre-check script emits an advisory reason when pipeline-tick has work pending. **It always fires the schedule** — skip logic belongs inside pipeline-tick itself, not here. Multiple pipelines coexist by sharing one script with a single managed block (it scans every `~/.trinity/pipeline-state/*/*.json`).
+The pre-check script always emits `fire` so the heartbeat schedule runs. It never emits a message override. Skip / work-detection logic belongs inside pipeline-tick itself, not here. Multiple pipelines share one script with a single managed block — no per-pipeline edits needed.
 
-> ⚠️ **Why this constraint matters.** Trinity's pre-check API is **agent-global** — the same `~/.trinity/pre-check` is consulted before every scheduled skill on the agent, not just pipeline-tick. If the block ever returns empty stdout, Trinity silences **every** schedule on the agent (digests, heartbeats, batch jobs, the lot). Earlier versions of this template made that mistake. The block default MUST be `echo "fire"`.
+> ⚠️ **Why this constraint matters.** Trinity's pre-check API is **agent-global** — the same `~/.trinity/pre-check` is consulted before every scheduled skill on the agent, not just pipeline-tick. Two failure modes both silently hijack unrelated schedules:
+>
+> 1. **Empty stdout** silences every schedule on the agent (digests, heartbeats, batch jobs, the lot). v1 of this template made this mistake.
+> 2. **Any non-`fire`/`skip` stdout becomes the message override** applied to whichever schedule called the pre-check — overwriting the intended message of unrelated schedules and making them run whatever the override text says (e.g. `pipeline-tick`) instead of their own work. v2 of this template made this mistake.
+>
+> The block must emit exactly `echo "fire"` — nothing else.
 
 ```bash
 PRE_CHECK="$HOME/.trinity/pre-check"
@@ -179,12 +184,16 @@ if [ ! -f "$PRE_CHECK" ]; then
 fi
 
 # Migrate or install the block
-if grep -q "BEGIN add-pipeline block v2" "$PRE_CHECK"; then
-  echo "add-pipeline block v2 already present in pre-check — skipping."
+if grep -q "BEGIN add-pipeline block v3" "$PRE_CHECK"; then
+  echo "add-pipeline block v3 already present in pre-check — skipping."
 elif grep -q "BEGIN add-pipeline block" "$PRE_CHECK"; then
-  # v1 block present — rewrite it in place (v1 returned empty stdout when idle,
-  # silencing all other agent schedules; v2 defaults to "fire").
-  echo "⚠️  Found v1 add-pipeline block in pre-check — replacing with v2 (default-fire)."
+  # v1 or v2 block present — rewrite it in place.
+  # v1 returned empty stdout when idle, silencing every other agent schedule.
+  # v2 emitted "pipeline-tick: <reason>" when work was pending, which Trinity
+  # applies as a message override to whichever schedule called the pre-check —
+  # hijacking unrelated schedules into running pipeline-tick. v3 always emits
+  # "fire" and never overrides messages.
+  echo "⚠️  Found older add-pipeline block in pre-check — replacing with v3 (always fire, no override)."
   TMP=$(mktemp)
   awk '
     /BEGIN add-pipeline block/ {skip=1; next}
@@ -316,7 +325,7 @@ Status: <installed via Trinity MCP | NOT installed — see Step 7>
 | Trinity MCP unavailable | Skip schedule install, print manual instructions |
 | dashboard.yaml has conflicting `pipelines:` key | Warn, leave existing alone, suggest manual review |
 | pre-check has un-marked content | Append our block but warn the user to review |
-| pre-check has v1 add-pipeline block (no `v2` marker) | Auto-rewrite to v2 (v1 emitted empty stdout when idle, silencing every other schedule on the agent — see Step 6) |
+| pre-check has v1 or v2 add-pipeline block (no `v3` marker) | Auto-rewrite to v3 (v1 silenced other schedules with empty stdout; v2 hijacked other schedules with a `pipeline-tick:` message override — see Step 6) |
 
 ## Idempotency
 
