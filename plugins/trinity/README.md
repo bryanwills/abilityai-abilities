@@ -16,6 +16,7 @@ Set up, connect, deploy, and sync Claude Code agents to the Trinity Deep Agent O
 /trinity:onboard              # Per-agent: make compatible and deploy
 /trinity:sync                 # Ongoing: sync changes between local and remote
 /trinity:create-dashboard     # Add dashboard to existing agent
+/trinity:loop                 # Run a remote agent in a sequential, bounded loop
 ```
 
 ## Skills
@@ -27,6 +28,7 @@ Set up, connect, deploy, and sync Claude Code agents to the Trinity Deep Agent O
 | **onboard** | Full onboarding flow — compatibility check, file creation, deploy to remote |
 | **sync** | Synchronize local/remote changes, supports multiple remotes |
 | **create-dashboard** | Generate an `/update-dashboard` skill for existing agents |
+| **loop** | Run a remote agent task sequentially — fixed N iterations or until a stop signal, with optional response chaining. The remote counterpart to Claude Code's local `/loop` |
 
 ## User Flow
 
@@ -72,7 +74,22 @@ Once connected, Trinity MCP tools are available directly:
 | `mcp__trinity__chat_with_agent` | Send messages to remote agents |
 | `mcp__trinity__deploy_local_agent` | Deploy agent to Trinity |
 | `mcp__trinity__get_agent` | Get agent details |
+| `mcp__trinity__run_agent_loop` | Run an agent task sequentially up to N times (server-side; see `/trinity:loop`) |
+| `mcp__trinity__get_loop_status` | Poll a loop's per-run progress |
+| `mcp__trinity__stop_loop` | Request a graceful stop of a running loop |
 | `mcp__trinity__*` | Schedule and event management tools |
+
+### Three execution patterns
+
+Trinity exposes three ways to drive a remote agent:
+
+| Pattern | Tool / skill | Shape |
+|---------|--------------|-------|
+| Single turn | `mcp__trinity__chat_with_agent` | One request, one response |
+| Parallel batch | `mcp__trinity__fan_out` | The same task across many inputs at once |
+| **Sequential loop** | **`/trinity:loop`** / `run_agent_loop` | N ordered iterations, optionally chained (`{{previous_response}}`), exits on a cap or a `[[DONE]]` stop signal |
+
+`/trinity:loop` is the **remote** counterpart to Claude Code's built-in `/loop`: same two modes (fixed count vs run-until-a-signal), but the loop body runs server-side, so you fire once and disconnect.
 
 ## Migrated Features
 

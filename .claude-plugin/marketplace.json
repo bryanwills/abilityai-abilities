@@ -60,7 +60,8 @@
         "./skills/onboard",
         "./skills/sync",
         "./skills/create-dashboard",
-        "./skills/deploy-new-instance"
+        "./skills/deploy-new-instance",
+        "./skills/loop"
       ]
     },
     {
