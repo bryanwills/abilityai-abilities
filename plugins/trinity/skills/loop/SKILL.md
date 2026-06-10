@@ -1,15 +1,17 @@
 ---
 name: loop
 description: Run a remote Trinity agent task in a sequential, bounded loop — a fixed number of iterations or until a stop signal, with optional response chaining. Fires server-side via run_agent_loop (caller can disconnect), then polls and renders progress. The remote, durable counterpart to Claude Code's local /loop.
-argument-hint: "[start|status|stop] [@agent] [<message>]"
+argument-hint: "[status|stop] [@agent] <message> [<N> times] [every <N>m|s] [until <condition>]"
 disable-model-invocation: true
 user-invocable: true
 allowed-tools: AskUserQuestion, Read, mcp__trinity__list_agents, mcp__trinity__run_agent_loop, mcp__trinity__get_loop_status, mcp__trinity__stop_loop
 metadata:
-  version: "1.0.1"
+  version: "1.2"
   created: 2026-06-09
   author: Ability.ai
   changelog:
+    - "1.2: No @agent now defaults to this agent's remote copy (.trinity-remote.yaml / name match); fire without confirmation when the task is clear"
+    - "1.1: Surface modifiers in argument-hint and Usage (count, every-cadence, until); document 1h delay ceiling with redirect to schedules"
     - "1.0.1: Quote argument-hint — unquoted brackets broke YAML frontmatter, making the skill invisible"
     - "1.0: Initial version — modeled on Claude Code's /loop, backed by the run_agent_loop server primitive"
 ---
@@ -26,6 +28,16 @@ Use it for iterative refinement, agentic retry, and bounded polling that must ou
 /trinity:loop [@agent] <message>             start a loop (default verb)
 /trinity:loop status <loop_id>               show per-run progress
 /trinity:loop stop <loop_id>                 request a graceful stop
+```
+
+No `@agent` means **this agent's remote copy** — the usual case is looping your own remote counterpart on Trinity.
+
+Modifiers, anywhere in the message:
+
+```
+<N> times | x<N> | max <N>      iteration cap (max_runs, 1–100; default 5)
+every <N>m | every <N>s         pause between iterations (delay_seconds, up to 1h)
+until <condition> | stop when … Until mode — exits early on the [[DONE]] sentinel
 ```
 
 Examples:
@@ -63,7 +75,7 @@ Parse the input into `verb`, `@agent`, and the loop spec. Mirror `/loop`'s parsi
 2. **`@agent` token**: an `@name` token anywhere selects the target agent. Strip it from the message.
 3. **Iteration count**: a count phrase (`5 times`, `x5`, `10 iterations`, `max 10`) sets `max_runs`. If none is given, default to a sensible cap (`max_runs: 5`) and say so.
 4. **Mode signal**: an *until-condition* (`until it passes`, `until tests are green`, `until done`, `stop when …`) → **Until mode**. Otherwise → **Fixed mode**.
-5. **Cadence**: a `every <N>m`/`every <N>s` clause sets `delay_seconds`. Strip it from the message.
+5. **Cadence**: a `every <N>m`/`every <N>s` clause sets `delay_seconds`. Strip it from the message. The API caps it at 3600 — if the user asks for a period over 1 hour, don't silently clamp: tell them a loop isn't the right tool for that cadence and point them to a Trinity schedule (`create_agent_schedule` with a cron expression) instead.
 
 If the remaining message is empty, show the usage block and stop.
 
@@ -103,7 +115,10 @@ Example: `Draft section {{run}} of the report. Stay consistent with what came be
 ### PHASE 1 — Resolve the target agent
 
 1. If an `@agent` was given, use it.
-2. Otherwise call `mcp__trinity__list_agents`. If exactly one agent exists, use it. If several, `AskUserQuestion` with the agents as options (label = name, description = its purpose/status). Prefer a `running` agent — a loop needs the agent up.
+2. Otherwise, default to **the remote copy of this agent** — the primary use case is looping your own remote counterpart. Resolve it:
+   - Read `.trinity-remote.yaml` at the repo root if present (written by `/trinity:onboard` and `/trinity:sync`) and use the agent name it tracks (the default remote if several).
+   - Otherwise call `mcp__trinity__list_agents` and match this agent's own name (from `template.yaml` or the working directory name).
+3. Only if no remote counterpart can be found, fall back to `mcp__trinity__list_agents`: exactly one agent → use it; several → `AskUserQuestion` with the agents as options (label = name, description = its purpose/status). Prefer a `running` agent — a loop needs the agent up.
 
 ### PHASE 2 — Design the loop
 
@@ -118,9 +133,9 @@ From the parse, assemble the `run_agent_loop` arguments:
 
 If a key parameter is genuinely ambiguous (e.g. mode unclear, or no agent could be resolved), ask **one** focused `AskUserQuestion`. Don't interrogate — infer sensible defaults and state them.
 
-### PHASE 3 — Confirm, then fire
+### PHASE 3 — Fire
 
-Show the resolved plan in one compact block and get a go-ahead:
+If the task is clear — agent resolved, mode and cap unambiguous — call `mcp__trinity__run_agent_loop` **immediately, without asking for confirmation**, and show the resolved plan alongside the handle it returns:
 
 ```
 Agent:    researcher
@@ -129,7 +144,7 @@ Delay:    none
 Message:  run the test suite. If every test passes, end your reply with [[DONE]] …
 ```
 
-On approval, call `mcp__trinity__run_agent_loop`. It returns immediately with a `loop_id`.
+Confirm first only when something genuinely warrants it: a key parameter was ambiguous and you had to guess, or the cost is outsized (large `max_runs` × expensive `model` — see Guardrails). One question max, then fire.
 
 ### PHASE 4 — Report the handle
 
