@@ -6,10 +6,11 @@ disable-model-invocation: true
 user-invocable: true
 allowed-tools: AskUserQuestion, Read, mcp__trinity__list_agents, mcp__trinity__run_agent_loop, mcp__trinity__get_loop_status, mcp__trinity__stop_loop
 metadata:
-  version: "1.2"
+  version: "1.3"
   created: 2026-06-09
   author: Ability.ai
   changelog:
+    - "1.3: Until sentinel must be tied to verifiable evidence (not self-assessment); stall detection in status/observe; timeout_per_run recommended for Until mode; durable artifacts in agent files, not {{previous_response}}"
     - "1.2: No @agent now defaults to this agent's remote copy (.trinity-remote.yaml / name match); fire without confirmation when the task is clear"
     - "1.1: Surface modifiers in argument-hint and Usage (count, every-cadence, until); document 1h delay ceiling with redirect to schedules"
     - "1.0.1: Quote argument-hint — unquoted brackets broke YAML frontmatter, making the skill invisible"
@@ -44,7 +45,7 @@ Examples:
 
 ```
 /trinity:loop @researcher draft section {{run}} of the report, 5 times
-/trinity:loop refine this summary until it's tight — stop when you're done
+/trinity:loop refine the report until every TODO marker is resolved — stop when none remain
 /trinity:loop @ci-agent run the test suite until it passes, max 10
 /trinity:loop @monitor poll the deploy every 2m until it's healthy
 /trinity:loop status loop_a1b2c3
@@ -97,7 +98,9 @@ The default. Set `max_runs: N`. The loop runs N times and stops with `stop_reaso
 ### Until mode
 Triggered by an until-condition. Set a `stop_signal` (use `[[DONE]]`) **and** a `max_runs` safety cap (the loop will not run forever — the cap always wins). Then **rewrite the message so the agent emits the sentinel when the condition is met** — this is the crucial step. For example:
 
-> `run the test suite. If every test passes, end your reply with [[DONE]]. Otherwise, report what failed.`
+> `run the test suite. If every test passes, paste the passing output and end your reply with [[DONE]]. Otherwise, report what failed.`
+
+Tie the sentinel to **verifiable evidence** (test output, an HTTP 200, zero remaining TODOs), not self-assessment — models skew positive grading their own work, so a gameable condition ("until it's good", "until it's tight") will exit on the first pass. If the user's condition is subjective, rewrite it into something checkable or keep the cap low.
 
 The loop exits early with `stop_reason: stop_signal_matched` on the first iteration whose response contains `[[DONE]]`.
 
@@ -107,6 +110,8 @@ If the task refines or builds on prior output ("refine", "improve each pass", "c
 - `{{previous_response}}` → the trailing 2000 chars of the previous iteration's response (empty on run 1)
 
 Example: `Draft section {{run}} of the report. Stay consistent with what came before: {{previous_response}}`
+
+`{{previous_response}}` is lossy (trailing 2000 chars) — fine as a hint, not as the artifact. When iterations build a real artifact (a draft, a migration, a report), instruct the agent to keep it in a file in its workspace and re-read it each run: `Refine the draft in report.md — read it first, improve it, write it back.` The remote agent's filesystem persists across runs; the loop context doesn't.
 
 ---
 
@@ -128,7 +133,7 @@ From the parse, assemble the `run_agent_loop` arguments:
 - `max_runs` — the count, or the default cap (1–100)
 - `stop_signal` — `[[DONE]]` for Until mode; omit for Fixed mode
 - `delay_seconds` — from any cadence clause (0–3600); omit if none
-- `timeout_per_run` — only if the task is long-running and the user said so (10–7200); else omit to inherit the agent default
+- `timeout_per_run` — set it for Until-mode loops (a hung iteration silently stalls the whole sequence); size it to the task, e.g. 600 for a test suite. For Fixed mode, set only if the task is long-running; else omit to inherit the agent default (10–7200)
 - `model` — only if the user named one (e.g. `claude-opus-4-8`); else omit
 
 If a key parameter is genuinely ambiguous (e.g. mode unclear, or no agent could be resolved), ask **one** focused `AskUserQuestion`. Don't interrogate — infer sensible defaults and state them.
@@ -158,6 +163,8 @@ The server starts iterating right away — like `/loop`, the first run happens *
 
 If the user wants to watch, poll `mcp__trinity__get_loop_status` and render the per-run summary as a table — `run_number · status · cost · duration · response preview`. Re-poll on request rather than busy-looping. Stop polling once `status` is terminal (`completed` / `stopped` / `failed` / `interrupted`) and report the `stop_reason` and final response.
 
+**Watch for stalls**: if consecutive responses are near-identical (same failure, same output, no state change), the loop is burning budget without progress — flag it and suggest `/trinity:loop stop <loop_id>`. The cap alone won't catch a stalled loop running under the limit.
+
 ---
 
 ## Verb: `status`
@@ -166,6 +173,7 @@ Call `mcp__trinity__get_loop_status` with the `loop_id` and render:
 - header: `status`, `stop_reason` (if terminal), `runs_completed / max_runs`, total cost
 - a per-run table: `# · status · cost · duration · response preview`
 - the last full response below the table
+- a stall warning if recent responses are near-identical with no progress — suggest `stop` rather than letting it run to the cap
 
 If no `loop_id` was given and none is in this session's context, ask for it — there is no MCP "list loops" call, but loops are visible on the agent's **Loops** tab and in the execution timeline (tagged with `loop_id`) in the Trinity web UI.
 
