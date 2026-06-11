@@ -4,12 +4,13 @@ description: Run a remote Trinity agent task in a sequential, bounded loop — a
 argument-hint: "[status|stop] [@agent] <message> [<N> times] [every <N>m|s] [until <condition>]"
 disable-model-invocation: true
 user-invocable: true
-allowed-tools: AskUserQuestion, Read, mcp__trinity__list_agents, mcp__trinity__run_agent_loop, mcp__trinity__get_loop_status, mcp__trinity__stop_loop
+allowed-tools: AskUserQuestion, Read, Skill, mcp__trinity__list_agents, mcp__trinity__run_agent_loop, mcp__trinity__get_loop_status, mcp__trinity__stop_loop
 metadata:
-  version: "1.3"
+  version: "1.4"
   created: 2026-06-09
   author: Ability.ai
   changelog:
+    - "1.4: Default local watch after firing — dynamic /loop (ScheduleWakeup) polls get_loop_status, reports changes/stalls/terminal state; skipped on fire-and-forget or when local /loop is unavailable"
     - "1.3: Until sentinel must be tied to verifiable evidence (not self-assessment); stall detection in status/observe; timeout_per_run recommended for Until mode; durable artifacts in agent files, not {{previous_response}}"
     - "1.2: No @agent now defaults to this agent's remote copy (.trinity-remote.yaml / name match); fire without confirmation when the task is clear"
     - "1.1: Surface modifiers in argument-hint and Usage (count, every-cadence, until); document 1h delay ceiling with redirect to schedules"
@@ -159,9 +160,17 @@ The server starts iterating right away — like `/loop`, the first run happens *
 - how to come back: `/trinity:loop status <loop_id>` and `/trinity:loop stop <loop_id>`
 - that they can disconnect; the loop also appears on the agent's **Loops** tab in the Trinity web UI
 
-### PHASE 5 — Observe (optional)
+### PHASE 5 — Local watch (default)
 
-If the user wants to watch, poll `mcp__trinity__get_loop_status` and render the per-run summary as a table — `run_number · status · cost · duration · response preview`. Re-poll on request rather than busy-looping. Stop polling once `status` is terminal (`completed` / `stopped` / `failed` / `interrupted`) and report the `stop_reason` and final response.
+After reporting the handle, start a lightweight local watch **by default** — skip it only if the user said fire-and-forget (or equivalent), or the session is headless. Invoke Claude Code's built-in dynamic `/loop` skill (no interval — it self-paces via `ScheduleWakeup`) with a watch prompt like:
+
+> check trinity loop `<loop_id>` via `mcp__trinity__get_loop_status`; post one line only when something changed (`run N/M · status · cost`) or the loop looks stalled (near-identical consecutive responses — suggest `/trinity:loop stop <loop_id>`); when status is terminal, report `stop_reason` and the final response, then end the loop
+
+Pace the watch to the loop: hint the expected iteration time (`delay_seconds` + typical run duration) in the prompt so wakeups aren't wasted. Tell the user the watch is on and that they can stop it anytime (say "stop watching" or Esc) — the remote loop keeps running either way. If the local `/loop` skill isn't available in this harness, skip the watch and just point to `/trinity:loop status <loop_id>`.
+
+### PHASE 6 — Observe on demand
+
+If the user asks to look right now, poll `mcp__trinity__get_loop_status` and render the per-run summary as a table — `run_number · status · cost · duration · response preview`. Re-poll on request rather than busy-looping. Stop polling once `status` is terminal (`completed` / `stopped` / `failed` / `interrupted`) and report the `stop_reason` and final response.
 
 **Watch for stalls**: if consecutive responses are near-identical (same failure, same output, no state change), the loop is burning budget without progress — flag it and suggest `/trinity:loop stop <loop_id>`. The cap alone won't catch a stalled loop running under the limit.
 
