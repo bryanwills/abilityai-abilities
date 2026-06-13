@@ -6,10 +6,11 @@ disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, mcp__trinity__list_agents, mcp__trinity__deploy_local_agent, mcp__trinity__get_agent
 metadata:
-  version: "4.7"
+  version: "4.8"
   created: 2025-02-05
   author: Ability.ai
   changelog:
+    - "4.8: Document Trinity resource constraints (integer cpu, g-suffix memory) in Step 3a + error table — fractional cpu/Mi memory are rejected at deploy time"
     - "4.7: Add /agent-dev:add-git-sync follow-up prompt in both completion paths"
     - "4.6: Add GitHub PAT troubleshooting guide for private repo deployment"
     - "4.5: Prefer GitHub repository deployment over local files when remote exists"
@@ -435,9 +436,18 @@ description: |
   [Description - ask user or extract from CLAUDE.md]
 avatar_prompt: [A vivid character description for generating the agent's avatar portrait - see below]
 resources:
-  cpu: "2"
-  memory: "4g"
+  cpu: "2"      # integer only: "1" | "2" | "4" | "8" | "16"
+  memory: "4g"  # g-suffix only: "1g" | "2g" | "4g" | "8g" | "16g" | "32g"
 ```
+
+**Resource constraints — Trinity rejects invalid values at deploy time, not before.** Trinity validates `resources` server-side and only accepts a fixed set:
+
+| Field | Accepted values | Rejected (examples) |
+|-------|-----------------|---------------------|
+| `cpu` | `"1"`, `"2"`, `"4"`, `"8"`, `"16"` (whole-number string) | `"0.5"` — Trinity parses cpu with `int()`, which raises on a fractional string and is the first thing to blow up |
+| `memory` | `"1g"`, `"2g"`, `"4g"`, `"8g"`, `"16g"`, `"32g"` | `"512Mi"`, `"4Gi"`, `"4096m"` — only the lowercase `g` suffix is accepted |
+
+Keep the defaults (`cpu: "2"`, `memory: "4g"`) unless the user explicitly needs a heavier tier — and when they do, snap their request to the nearest **allowed** value rather than passing through an arbitrary number. Never write a fractional cpu or a `Mi`/`Gi`/`m` memory suffix into `template.yaml`; the deploy in Step 5 will fail validation if you do.
 
 **avatar_prompt guidance:** This field is used by Trinity to generate a portrait avatar for the agent using AI image generation. Write a vivid, specific character description that captures the agent's personality and role. The prompt should describe a person or character as a portrait subject — appearance, attire, expression, setting, and lighting.
 
@@ -744,6 +754,7 @@ Only perform Steps 1-2 (check state and gather info), then present a report with
 | No CLAUDE.md | Create minimal CLAUDE.md first |
 | MCP tools not available | Restart Claude Code after creating .mcp.json |
 | Deployment failed | Check Trinity URL and API key are correct |
+| Deploy rejected on `resources` (e.g. `invalid literal for int() with base 10: '0.5'`) | `template.yaml` has an invalid cpu/memory. cpu must be integer (`"1"`/`"2"`/`"4"`/`"8"`/`"16"`), memory must use the `g` suffix (`"1g"`..`"32g"`). Fix `template.yaml` and redeploy — see Step 3a |
 | Agent already exists | Will update existing agent |
 | Git clone/pull fails on remote | Configure GitHub PAT in Trinity (see below) |
 
