@@ -602,6 +602,18 @@ avatar_prompt: A focused web designer at a clean modern desk with a large curved
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: weekly-site-health
+    name: Weekly site health check
+    cron: "0 9 * * 1"
+    timezone: America/New_York
+    message: "Check deployed sites — build status, broken links, performance regressions, and SSL/cert expiry; report issues."
+    purpose: Weekly site health monitoring
+    enabled: false
 ```
 
 ### 7b. .env.example

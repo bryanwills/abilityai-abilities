@@ -1186,6 +1186,25 @@ avatar_prompt: ${preset.avatar_prompt}
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: kb-coherence
+    name: Weekly KB coherence check
+    cron: "0 3 * * 1"
+    timezone: America/New_York
+    message: "Run a coherence pass over the knowledge graph — detect contradictions, orphaned nodes, and stale entries; report proposed fixes."
+    purpose: Keep the knowledge base coherent
+    enabled: false
+  - id: daily-ingest
+    name: Daily ingest sweep
+    cron: "0 6 * * *"
+    timezone: America/New_York
+    message: "Ingest any new source documents into the knowledge base and update the graph."
+    purpose: Incremental ingestion
+    enabled: false
 ```
 
 Preset-specific avatar prompts live in the **Preset Defaults** section.

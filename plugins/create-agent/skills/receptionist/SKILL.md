@@ -1226,6 +1226,18 @@ avatar_prompt: A composed, alert professional standing at a sleek modern recepti
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: daily-queue-review
+    name: Daily request queue review
+    cron: "0 8 * * 1-5"
+    timezone: America/New_York
+    message: "Review the overnight inbox and routing queue — summarize what arrived and flag anything unhandled or needing escalation."
+    purpose: Daily triage of inbound requests
+    enabled: false
 ```
 
 ### 10b. .env.example

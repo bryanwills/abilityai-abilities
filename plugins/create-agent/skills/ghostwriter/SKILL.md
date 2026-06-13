@@ -393,6 +393,18 @@ avatar_prompt: A creative writer in their element — sitting at a vintage woode
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: weekly-content-plan
+    name: Weekly content plan
+    cron: "0 9 * * 1"
+    timezone: America/New_York
+    message: "Draft this week's content calendar across platforms, in the configured brand voice."
+    purpose: Weekly content planning
+    enabled: false
 ```
 
 [Customize description based on actual Q1-Q3 answers.]
@@ -967,12 +979,12 @@ Identify the first incomplete step in the current phase. Provide specific guidan
 - After completion, mark done and advance phase.
 
 **For `schedules_configured`:**
-- Tell user to use MCP schedule tools (`mcp__trinity__create_schedule`).
-- Suggest scheduling `/update-dashboard` every 6 hours.
+- Tell user the recommended schedules are declared in `template.yaml` (`schedules:`); deploying with `/trinity:onboard` reconciles them onto the instance.
+- Suggest enabling the weekly content plan (and `/update-dashboard` every 6 hours if a dashboard is configured) via `mcp__trinity__toggle_agent_schedule`.
 - After completion, mark done.
 
 **For `first_scheduled_run`:**
-- Tell user to check scheduled executions via MCP (`mcp__trinity__list_schedules`).
+- Tell user to check scheduled executions via `mcp__trinity__get_schedule_executions`.
 - After verified, mark done.
 
 ### Step 4: Update State

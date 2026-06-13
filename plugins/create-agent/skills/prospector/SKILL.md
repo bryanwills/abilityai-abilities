@@ -671,6 +671,18 @@ avatar_prompt: A sharp-eyed young professional in smart business casual — navy
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: weekly-account-refresh
+    name: Weekly account refresh
+    cron: "0 8 * * 1"
+    timezone: America/New_York
+    message: "Refresh research on tracked target accounts — funding, headcount, news, and new buying signals."
+    purpose: Keep tracked-account research current
+    enabled: false
 ```
 
 ### 7b. .env.example

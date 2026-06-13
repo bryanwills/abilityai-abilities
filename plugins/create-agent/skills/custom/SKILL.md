@@ -267,7 +267,7 @@ Skills that should run on a recurring basis once the agent is deployed to Trinit
 | `/[skill-name]` | [cron expression or human interval] | [why it runs on this cadence] |
 | `/[skill-name]` | [cron expression or human interval] | [why it runs on this cadence] |
 
-*To activate schedules after deploying to Trinity, use `mcp__trinity__create_schedule`.*
+*Source of truth: the `schedules:` block in `template.yaml`. Deploying with `/trinity:onboard` reconciles it onto Trinity; turn individual schedules on/off on the live agent with `mcp__trinity__toggle_agent_schedule`.*
 
 ## Guidelines
 
@@ -335,7 +335,22 @@ avatar_prompt: [Generate a vivid character portrait prompt that fits the agent's
 resources:
   cpu: "2"
   memory: "4g"
+
+# Optional: recommended schedules (design source of truth). /trinity:onboard &
+# /trinity:sync reconcile these onto the instance; `enabled` is the recommended
+# default and the operator toggles activation on the live agent. Propose 1–2 from
+# the agent's purpose, or omit this block if it has no scheduled tasks.
+# schedules:
+#   - id: daily-summary
+#     name: Daily summary
+#     cron: "0 9 * * *"
+#     timezone: America/New_York
+#     message: "Summarize yesterday's activity and surface anything needing attention."
+#     purpose: Daily status digest
+#     enabled: false
 ```
+
+**schedules guidance:** If the agent has recurring tasks, uncomment the `schedules:` block above and add 1–2 entries derived from its purpose (fields map one-to-one onto `create_agent_schedule`; see `/trinity:onboard` Step 3a). Leave them `enabled: false` so the operator chooses what runs after deploy. Omit the block entirely for purely on-demand agents.
 
 **avatar_prompt guidance:** Write a vivid, specific character description for generating the agent's portrait. Describe a person or character — appearance, attire, expression, setting, and lighting — that embodies the agent's role and personality.
 
@@ -417,7 +432,7 @@ Write `[destination]/onboarding.json`. Customize the `local` phase based on the 
       "first_remote_run": { "done": false, "label": "Run a skill remotely via mcp__trinity__chat_with_agent" }
     },
     "schedules": {
-      "schedules_configured": { "done": false, "label": "Set up scheduled tasks (mcp__trinity__create_schedule)" },
+      "schedules_configured": { "done": false, "label": "Declare scheduled tasks in template.yaml (schedules:)" },
       "first_scheduled_run": { "done": false, "label": "Verify first scheduled execution completed" }
     }
   }
@@ -511,12 +526,12 @@ Identify the first incomplete step in the current phase. Based on which step it 
 - After completion, mark done and advance phase.
 
 **For `schedules_configured`:**
-- Tell user to use `mcp__trinity__create_schedule` and suggest which skills benefit from scheduling.
-- Reference the recommended schedules from CLAUDE.md.
+- Tell user the recommended schedules live in `template.yaml` (`schedules:`); deploying with `/trinity:onboard` reconciles them onto the instance. Suggest which skills benefit from scheduling and add them to the block.
+- To turn one on/off on the live agent, use `mcp__trinity__toggle_agent_schedule`.
 - After completion, mark done.
 
 **For `first_scheduled_run`:**
-- Tell user to check `mcp__trinity__list_schedules` for execution confirmation.
+- Tell user to check `mcp__trinity__get_schedule_executions` for execution confirmation.
 - After verified, mark done.
 
 ### Step 4: Update State

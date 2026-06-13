@@ -139,11 +139,11 @@ If missing, draft a complete graph from the agent's actual artifacts and skills.
 ### 3d. Recommended Schedules
 
 Check for:
-- `## Recommended Schedules` section
-- Table with Skill, Schedule, Purpose columns
-- Only automatable skills listed (not interactive ones)
-- Sensible cadences for each skill type
-- Reference to `mcp__trinity__create_schedule`
+- A `schedules:` block in `template.yaml` (the design source of truth)
+- Each entry has `id`, `name`, `cron`, `message` (fields map to `create_agent_schedule`)
+- Only automatable tasks listed (not interactive ones)
+- Sensible cadences for each task type
+- `enabled: false` by default (the operator chooses what runs); a `## Recommended Schedules` table in CLAUDE.md that renders the block
 
 If missing, analyze skills and propose schedules:
 - Monitoring/health → every 15m–1h

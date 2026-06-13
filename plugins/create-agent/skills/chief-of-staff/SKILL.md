@@ -938,6 +938,25 @@ avatar_prompt: A polished, composed executive assistant in their early 30s — t
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: daily-briefing
+    name: Daily morning briefing
+    cron: "0 7 * * 1-5"
+    timezone: America/New_York
+    message: "Prepare today's briefing — calendar, top priorities, meeting prep, and anything awaiting a decision."
+    purpose: Weekday morning briefing
+    enabled: false
+  - id: weekly-digest
+    name: Weekly digest
+    cron: "0 16 * * 5"
+    timezone: America/New_York
+    message: "Produce the weekly digest — what shipped, open decisions, and next week's priorities."
+    purpose: End-of-week summary
+    enabled: false
 ```
 
 ### 7b. .env.example

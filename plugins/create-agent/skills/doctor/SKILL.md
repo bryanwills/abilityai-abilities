@@ -430,6 +430,18 @@ avatar_prompt: |
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: weekly-health-review
+    name: Weekly health review
+    cron: "0 9 * * 1"
+    timezone: America/New_York
+    message: "Review newly ingested health documents, update lab-value trends, and flag anything worth raising with a doctor."
+    purpose: Weekly records and lab-trend review
+    enabled: false
 ```
 
 ---

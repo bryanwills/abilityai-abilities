@@ -1114,14 +1114,15 @@ Identify the first incomplete step in the current phase. Based on which step it 
 - After completion, mark done and advance phase to "schedules".
 
 **For `schedules_configured`:**
-- Tell user to use MCP schedule tools (`mcp__trinity__create_schedule`) and suggest these schedules:
+- Tell user the recommended schedules are declared in `template.yaml` (`schedules:`); deploying with `/trinity:onboard` reconciles them onto the instance. Recommended:
   - `/monitor` — weekday mornings (`0 8 * * 1-5`)
   - `/digest` — Monday morning (`0 9 * * 1`)
   - `/update-dashboard` — every 6 hours (`0 */6 * * *`)
+- To turn one on/off on the live agent, use `mcp__trinity__toggle_agent_schedule`.
 - After completion, mark done.
 
 **For `first_scheduled_run`:**
-- Tell user to check scheduled executions via MCP (`mcp__trinity__list_schedules`).
+- Tell user to check scheduled executions via `mcp__trinity__get_schedule_executions`.
 - After verified, mark done.
 
 ### Step 4: Update State
@@ -1362,6 +1363,25 @@ avatar_prompt: [industry-specific prompt from above]
 resources:
   cpu: "2"
   memory: "4g"
+
+# Recommended schedules (design source of truth). /trinity:onboard & /trinity:sync
+# reconcile these onto the instance; `enabled` is the recommended default and the
+# operator toggles activation on the live agent. Adjust to fit this agent.
+schedules:
+  - id: competitor-sweep
+    name: Daily competitor sweep
+    cron: "0 6 * * 1-5"
+    timezone: America/New_York
+    message: "Sweep tracked competitors for changes — pricing, product, messaging, hiring, news — and report anything material."
+    purpose: Daily change monitoring
+    enabled: false
+  - id: weekly-battlecard
+    name: Weekly battlecard refresh
+    cron: "0 9 * * 1"
+    timezone: America/New_York
+    message: "Refresh competitor battlecards from the week's findings."
+    purpose: Keep battlecards current
+    enabled: false
 ```
 
 ### 8c. Generate .env.example
