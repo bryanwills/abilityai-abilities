@@ -6,10 +6,11 @@ disable-model-invocation: true
 user-invocable: true
 allowed-tools: Bash, Read, Write, Grep, Glob, mcp__trinity__list_agents, mcp__trinity__chat_with_agent, mcp__trinity__list_operator_queue, mcp__trinity__get_operator_queue_item, mcp__trinity__list_agent_schedules, mcp__trinity__create_agent_schedule, mcp__trinity__update_agent_schedule, mcp__trinity__toggle_agent_schedule
 metadata:
-  version: "2.2.0"
+  version: "2.3.0"
   created: 2025-02-05
   author: eugene
   changelog:
+    - "2.3.0: Unified remote registry — sync's config is now `.trinity-remote.yaml` (was `.trinity-sync.yaml`), the same file `/trinity:onboard` writes and `/trinity:loop` reads. Fixes the onboard→sync handoff (sync now resolves the agent name onboard recorded instead of re-guessing). Schema gains onboard's machine-maintained `instance`/`profile`/`deployed_at` fields; migrates legacy single-remote files in place"
     - "2.2.0: Schedule reconciliation (Phase 7) — diff template.yaml schedules: against live Trinity schedules on push/pull/deploy/status; new `schedules` subcommand to reconcile on demand"
     - "2.1.1: Quote argument-hint — unquoted brackets broke YAML frontmatter, making the skill invisible"
     - "2.1: After syncing a remote, check its Operating Room queue and report any open ops notifications"
@@ -46,16 +47,21 @@ A single local agent can have multiple remote counterparts on Trinity:
 
 ## Configuration
 
-Remote instances are configured in `.trinity-sync.yaml` at the agent root:
+Remote instances are configured in `.trinity-remote.yaml` at the agent root. This is the **single registry of this agent's remote Trinity instances** — the same file `/trinity:onboard` writes at deploy time and `/trinity:loop` reads to find its remote counterpart. Sync owns the multi-remote and branch fields; onboard maintains the deploy-tracking fields (`instance`, `profile`, `deployed_at`).
 
 ```yaml
-# .trinity-sync.yaml
+# .trinity-remote.yaml
+#   Remote Trinity instances of this agent.
+#   instance / profile / deployed_at are machine-maintained by onboard — safe to leave as-is.
 default: prod  # Which remote to use when none specified
 
 remotes:
   prod:
-    agent: my-agent        # Trinity agent name
-    branch: main           # Branch this remote tracks
+    agent: my-agent                       # Trinity agent name        (sync)
+    branch: main                          # Branch this remote tracks (sync)
+    instance: https://trinity.example.com # Trinity URL deployed on    (onboard)
+    profile: default                      # CLI profile to reach it    (onboard)
+    deployed_at: 2026-06-16T12:00:00Z     # Last deploy, ISO 8601      (onboard)
     description: Production instance
 
   staging:
@@ -68,6 +74,10 @@ remotes:
     branch: experimental
     description: Development/experimental
 ```
+
+Only `agent` is required per remote; `branch` defaults to `main`, and the onboard fields are optional (present once the remote has been deployed to). Sync never needs `instance`/`profile`/`deployed_at` and leaves them untouched.
+
+**Legacy single-remote file:** Older `.trinity-remote.yaml` files written by onboard had top-level `agent:`/`instance:` keys and no `remotes:` block. When you encounter that shape, fold it into the unified form as the `default` remote (preserve its `agent`/`instance`/`profile`/`deployed_at`) before proceeding.
 
 **If no config exists:** Falls back to auto-detection (template.yaml name or directory name) as a single "default" remote.
 
@@ -109,7 +119,7 @@ When a command is executed, resolve the target remote:
 
 1. **Explicit `@remote`**: Use that remote's config
 2. **Environment variable**: `TRINITY_SYNC_TARGET=staging`
-3. **Default from config**: The `default:` field in `.trinity-sync.yaml`
+3. **Default from config**: The `default:` field in `.trinity-remote.yaml`
 4. **Auto-detect**: If no config exists, detect from template.yaml or directory name
 
 ```bash
@@ -119,8 +129,8 @@ resolve_remote() {
     echo "${1#@}"  # Strip @ prefix
   elif [[ -n "$TRINITY_SYNC_TARGET" ]]; then
     echo "$TRINITY_SYNC_TARGET"
-  elif [[ -f .trinity-sync.yaml ]]; then
-    grep "^default:" .trinity-sync.yaml | cut -d: -f2 | tr -d ' '
+  elif [[ -f .trinity-remote.yaml ]]; then
+    grep "^default:" .trinity-remote.yaml | cut -d: -f2 | tr -d ' '
   else
     echo "default"  # Will use auto-detection
   fi
@@ -133,15 +143,22 @@ resolve_remote() {
 
 ```bash
 # Check for config file
-if [[ -f .trinity-sync.yaml ]]; then
-  # Parse YAML - extract remotes section
-  # Each remote has: agent, branch, description
+if [[ -f .trinity-remote.yaml ]] && grep -q "^remotes:" .trinity-remote.yaml; then
+  # Unified multi-remote format
+  # Each remote has: agent, branch, description (+ onboard's instance/profile/deployed_at)
 
   # Get default remote
-  DEFAULT_REMOTE=$(grep "^default:" .trinity-sync.yaml | cut -d: -f2 | tr -d ' ')
+  DEFAULT_REMOTE=$(grep "^default:" .trinity-remote.yaml | cut -d: -f2 | tr -d ' ')
 
   # Get list of remote names
-  REMOTES=$(grep "^  [a-z].*:$" .trinity-sync.yaml | sed 's/://g' | tr -d ' ')
+  REMOTES=$(grep "^  [a-z].*:$" .trinity-remote.yaml | sed 's/://g' | tr -d ' ')
+elif [[ -f .trinity-remote.yaml ]] && grep -q "^agent:" .trinity-remote.yaml; then
+  # LEGACY single-remote file from an older onboard (top-level agent/instance, no remotes:).
+  # Migrate it in place: wrap the single remote as the "default" before continuing.
+  AGENT_NAME=$(grep "^agent:" .trinity-remote.yaml | cut -d: -f2 | tr -d ' ')
+  DEFAULT_REMOTE="default"
+  # Rewrite into unified form, preserving instance/profile/deployed_at as the default remote's fields.
+  # (Offer this migration to the user; don't discard the deploy-tracking fields.)
 else
   # No config - create implicit default from auto-detection
   if [[ -f template.yaml ]]; then
@@ -163,7 +180,7 @@ fi
 When running `/trinity-sync add-remote` with no existing config, create one:
 
 ```yaml
-# Auto-generated .trinity-sync.yaml
+# Auto-generated .trinity-remote.yaml
 default: prod
 
 remotes:
@@ -177,7 +194,7 @@ remotes:
 
 `/trinity-sync add-remote <name> <agent-name> [branch]`
 
-1. Load or create `.trinity-sync.yaml`
+1. Load or create `.trinity-remote.yaml`
 2. Verify remote name doesn't already exist
 3. Verify agent exists on Trinity: `mcp__trinity__list_agents`
 4. Add new remote entry:
@@ -259,7 +276,7 @@ Before any operation, resolve which remote(s) to target:
 
 ```
 1. Parse command for @remote specifier
-2. Load .trinity-sync.yaml (if exists)
+2. Load .trinity-remote.yaml (if exists)
 3. Resolve target remote:
    - Explicit @remote → use that config
    - $TRINITY_SYNC_TARGET → use that
@@ -369,7 +386,7 @@ Based on analysis, command, and target remote:
 5. Tell remote agent to fetch and checkout the branch
 6. **Update remote config** if branch differs from tracked:
    - Ask: "Update @remote to track <branch>? (y/n)"
-   - If yes, update `.trinity-sync.yaml`
+   - If yes, update `.trinity-remote.yaml`
 
 **If `/trinity-sync deploy <branch>` or `/trinity-sync deploy @remote <branch>`:**
 1. Resolve target remote
@@ -550,7 +567,7 @@ Both agents sync through the shared GitHub repository. GitHub is the source of t
 
 1. **GitHub is source of truth** - All agents sync through the shared repo
 2. **Explicit remote targeting** - Use @remote to target specific instances
-3. **Config over convention** - Use `.trinity-sync.yaml` for explicit control
+3. **Config over convention** - Use `.trinity-remote.yaml` for explicit control
 4. **Agent value MUST sync** - skills/, agents/, commands/, memory/, scripts/ are the agent itself
 5. **Runtime files are ephemeral** - Only debug/, projects/, statsig/, todos/, session-files/ can be discarded
 6. **Deletions are suspicious** - Usually accidental; verify before accepting
@@ -580,7 +597,7 @@ If you've been using trinity-sync without a config file:
 ```
 User: /trinity-sync add-remote prod my-agent main
 
-Agent: Creating .trinity-sync.yaml with initial configuration...
+Agent: Creating .trinity-remote.yaml with initial configuration...
 
 ✓ Created config with 'prod' as default remote
 
@@ -706,7 +723,7 @@ Agent: Adding new remote configuration...
 [Verifying my-agent-qa exists on Trinity]
 ✓ Agent found: my-agent-qa (running)
 
-[Updating .trinity-sync.yaml]
+[Updating .trinity-remote.yaml]
 
 Added remote:
   qa:
@@ -747,7 +764,7 @@ Agent: Updating default remote...
 Previous default: prod
 New default: staging
 
-Updated .trinity-sync.yaml
+Updated .trinity-remote.yaml
 
 Now `/trinity-sync push` without @remote will target my-agent-staging.
 ```
@@ -756,7 +773,7 @@ Now `/trinity-sync push` without @remote will target my-agent-staging.
 
 ```
 User: /trinity-sync status
-(no .trinity-sync.yaml exists)
+(no .trinity-remote.yaml exists)
 
 Agent: No sync configuration found. Using auto-detection...
 

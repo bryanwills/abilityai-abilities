@@ -6,10 +6,11 @@ disable-model-invocation: true
 user-invocable: true
 allowed-tools: AskUserQuestion, Read, Skill, mcp__trinity__list_agents, mcp__trinity__run_agent_loop, mcp__trinity__get_loop_status, mcp__trinity__stop_loop
 metadata:
-  version: "1.4"
+  version: "1.5"
   created: 2026-06-09
   author: Ability.ai
   changelog:
+    - "1.5: Resolve the remote from the unified `.trinity-remote.yaml` registry — read the `default` remote's `agent` under `remotes:` (with legacy single-remote fallback). Provenance now accurate: the file is genuinely written by both /trinity:onboard and /trinity:sync"
     - "1.4: Default local watch after firing — dynamic /loop (ScheduleWakeup) polls get_loop_status, reports changes/stalls/terminal state; skipped on fire-and-forget or when local /loop is unavailable"
     - "1.3: Until sentinel must be tied to verifiable evidence (not self-assessment); stall detection in status/observe; timeout_per_run recommended for Until mode; durable artifacts in agent files, not {{previous_response}}"
     - "1.2: No @agent now defaults to this agent's remote copy (.trinity-remote.yaml / name match); fire without confirmation when the task is clear"
@@ -122,7 +123,7 @@ Example: `Draft section {{run}} of the report. Stay consistent with what came be
 
 1. If an `@agent` was given, use it.
 2. Otherwise, default to **the remote copy of this agent** — the primary use case is looping your own remote counterpart. Resolve it:
-   - Read `.trinity-remote.yaml` at the repo root if present (written by `/trinity:onboard` and `/trinity:sync`) and use the agent name it tracks (the default remote if several).
+   - Read `.trinity-remote.yaml` at the repo root if present (the shared remote registry written by `/trinity:onboard` and `/trinity:sync`) and use the `agent` of its `default` remote under `remotes:`. For a legacy single-remote file (top-level `agent:`, no `remotes:`), use that `agent` directly.
    - Otherwise call `mcp__trinity__list_agents` and match this agent's own name (from `template.yaml` or the working directory name).
 3. Only if no remote counterpart can be found, fall back to `mcp__trinity__list_agents`: exactly one agent → use it; several → `AskUserQuestion` with the agents as options (label = name, description = its purpose/status). Prefer a `running` agent — a loop needs the agent up.
 
