@@ -6,11 +6,12 @@ disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Skill
 metadata:
-  version: "1.1"
+  version: "1.2"
   created: 2026-04-04
-  updated: 2026-06-14
+  updated: 2026-06-18
   author: Ability.ai
   changelog:
+    - "1.2: Apply Documentation Coherence fixes — generate missing README/ARCHITECTURE/TARGET-ARCHITECTURE + /reconcile-docs, fix descriptive targets, flag prescriptive-source drift"
     - "1.1: Compose /review-agent for the audit instead of an inline rubric (Composition Rule — single-sourced); add Skill to allowed-tools; add composition-aware fix guidance"
     - "1.0: Initial version"
 ---
@@ -45,15 +46,20 @@ If `CLAUDE.md` doesn't exist, ask for the correct path.
 Read all agent artifacts (skip any that don't exist — their absence is itself a finding):
 
 1. `CLAUDE.md`
-2. `template.yaml`
-3. `.env.example`
-4. `.gitignore`
-5. `.mcp.json.template` or `.mcp.json`
-6. All `SKILL.md` files:
+2. `README.md`, `ARCHITECTURE.md`, `TARGET-ARCHITECTURE.md`
+3. `template.yaml`
+4. `.env.example`
+5. `.gitignore`
+6. `.mcp.json.template` or `.mcp.json`
+7. All `SKILL.md` files:
    ```bash
    find .claude/skills -name "SKILL.md" 2>/dev/null
    ```
-7. Top-level file listing:
+8. Any subagents:
+   ```bash
+   ls .claude/agents/*.md 2>/dev/null
+   ```
+9. Top-level file listing:
    ```bash
    ls -la
    ```
@@ -66,6 +72,7 @@ Parse and display the agent's current state:
 **Identity**: [one-line summary or "not defined"]
 **Skills**: [count] — [list names]
 **Dependency Graph**: [present / missing]
+**Docs**: README [✓/✗] · ARCHITECTURE [✓/✗] · TARGET-ARCHITECTURE [✓/✗]
 **Recommended Schedules**: [present / missing]
 **Guidelines**: [count or "none"]
 **Trinity Ready**: [yes / partially / no]
@@ -85,6 +92,7 @@ From `$ARGUMENTS` or conversation context, identify what the user wants. If the 
 | **Improve identity** | "flesh out the identity section", "improve CLAUDE.md" |
 | **Add guidelines** | "add behavioral rules", "set up guidelines" |
 | **Fix skill docs** | "sync skills with CLAUDE.md", "document the skills" |
+| **Doc coherence** | "add architecture docs", "add a README", "the docs are out of date", "install /reconcile-docs" |
 | **Trinity readiness** | "make this Trinity-ready", "prepare for deployment" |
 | **Skill quality** | "review skill permissions", "check the skills" |
 
@@ -98,9 +106,10 @@ Use AskUserQuestion:
   2. Add artifact dependency graph
   3. Add recommended schedules
   4. Improve CLAUDE.md structure (identity, capabilities, guidelines)
-  5. Trinity readiness (template.yaml, .env, .gitignore)
-  6. Skill quality review
-  7. Other (describe)
+  5. Documentation coherence (README, ARCHITECTURE, TARGET-ARCHITECTURE, /reconcile-docs)
+  6. Trinity readiness (template.yaml, .env, .gitignore)
+  7. Skill quality review
+  8. Other (describe)
 
 ---
 
@@ -164,6 +173,7 @@ Everything else remains the same:
 - *Dependency graph (MISSING)* — draft a complete `artifacts:` + `sync_skills:` block from the agent's actual files and skills.
 - *Schedules (MISSING)* — propose cadences by task type: monitoring/health → 15m–1h; sync/update → 1–6h or daily; reports/summaries → daily/weekly; cleanup → weekly. Default `enabled: false`.
 - *Composition findings* — for skill-internal fixes (missing `Skill` tool, broken invoke target, cycles, inlined logic), hand off to `/agent-dev:adjust-playbook` rather than rewriting the SKILL.md's logic here.
+- *Documentation coherence (MISSING/DRIFT)* — for *missing* docs, generate them from the templates in `/create-agent:create` STEP 9 (`README.md`, `ARCHITECTURE.md`, `TARGET-ARCHITECTURE.md`) and install the `/reconcile-docs` skill (STEP 10); register all three in the dependency graph. For *drift*, respect the graph's direction: fix **descriptive targets** (`README.md`, `ARCHITECTURE.md`) to match reality, move shipped items from `TARGET-ARCHITECTURE.md` into `ARCHITECTURE.md`, and only **flag** drift in **prescriptive sources** (`CLAUDE.md`, `TARGET-ARCHITECTURE.md`) for the user — don't rewrite intent. Where an agent already has `/reconcile-docs`, prefer running it over re-deriving the checks here.
 
 ---
 
@@ -219,6 +229,7 @@ Changes applied:
 | Guidelines | [status] | [status] |
 | Skill Docs | [status] | [status] |
 | Skill Quality | [status] | [status] |
+| Doc Coherence | [status] | [status] |
 | Trinity Ready | [status] | [status] |
 | Hygiene | [status] | [status] |
 

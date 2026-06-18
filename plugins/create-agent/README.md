@@ -58,11 +58,21 @@ Each wizard is a guided conversation that:
 
 1. Asks domain-specific questions to understand your needs
 2. Scaffolds a Trinity-compatible agent directory
-3. Generates customized CLAUDE.md, skills, and configuration
+3. Generates customized CLAUDE.md, skills, docs (README + ARCHITECTURE + TARGET-ARCHITECTURE), and configuration
 4. Declares recommended `schedules:` in `template.yaml` (disabled by default — the operator chooses what runs)
 5. Optionally deploys to Trinity for remote execution
 
 Generated agents ship with a `schedules:` block in `template.yaml` describing the recurring tasks the agent is designed to run. They're declared `enabled: false` — `/trinity:onboard` and `/trinity:sync` reconcile them onto your Trinity instance, and you turn on the ones you want.
+
+### Current → target development model
+
+Every generated agent carries a clear picture of *what it is*, *how it runs today*, and *where it's going*:
+
+- **`README.md`** — human-facing capabilities overview (descriptive)
+- **`ARCHITECTURE.md`** — current state, how the agent runs today (descriptive)
+- **`TARGET-ARCHITECTURE.md`** — target state, where it's deliberately headed (prescriptive)
+
+The model is **A → B**: build toward the target, and when something ships, move it out of `TARGET-ARCHITECTURE.md` and into `ARCHITECTURE.md`. A bundled **`/reconcile-docs`** skill walks the agent's Artifact Dependency Graph and keeps these docs consistent with CLAUDE.md, the skills, and any subagents — run it after shipping a capability or on a weekly schedule. `/review` audits this coherence; `/adjust` retrofits the docs into agents created before this convention.
 
 All generated agents work locally first — Trinity deployment is the natural upgrade path, not a requirement.
 

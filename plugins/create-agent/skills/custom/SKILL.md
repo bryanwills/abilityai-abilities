@@ -6,11 +6,12 @@ disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 metadata:
-  version: "1.2"
+  version: "1.3"
   created: 2026-04-01
-  updated: 2026-04-21
+  updated: 2026-06-18
   author: Ability.ai
   changelog:
+    - "1.3: Scaffold ships README.md + ARCHITECTURE.md + TARGET-ARCHITECTURE.md (current→target development model) and a /reconcile-docs default skill that keeps them coherent with CLAUDE.md, skills, and subagents"
     - "1.2: Wizards emit a template.yaml schedules: block for declarative Trinity scheduling"
     - "1.1: Removed Trinity CLI references — deployment guidance is now MCP/onboard-based"
     - "1.0: Backfilled the /agent-dev:add-git-sync follow-up prompt into the scaffold"
@@ -114,6 +115,7 @@ If it exists and is non-empty, warn the user and ask whether to:
 mkdir -p [destination]/.claude/skills
 mkdir -p [destination]/.claude/skills/onboarding
 mkdir -p [destination]/.claude/skills/update-dashboard
+mkdir -p [destination]/.claude/skills/reconcile-docs
 ```
 
 Create subdirectories for each skill from Step 1d as well.
@@ -177,6 +179,16 @@ After deploying, interact with your remote agent through the Trinity MCP tools a
 
 Learn more at [ability.ai](https://ability.ai)
 
+## Architecture & Direction
+
+This agent is developed deliberately, from where it is to where it's going:
+
+- **`ARCHITECTURE.md`** — the *current state*: how the agent actually runs today (skills, subagents, data, schedules). Descriptive — it tracks reality.
+- **`TARGET-ARCHITECTURE.md`** — the *target state*: where the agent is deliberately headed and why. Prescriptive — it defines intent.
+- **`README.md`** — the human-facing capabilities overview, derived from this file and the skills.
+
+Both architecture docs are living documents. The development model is **A → B**: build toward the target, and **when something ships, move it out of `TARGET-ARCHITECTURE.md` and into `ARCHITECTURE.md`.** Keep the descriptive docs (`ARCHITECTURE.md`, `README.md`) honest about what exists; keep the prescriptive doc (`TARGET-ARCHITECTURE.md`) honest about what's next. Run `/reconcile-docs` to check they — and CLAUDE.md, the skills, and any subagents — stay consistent.
+
 ## Onboarding
 
 This agent tracks your setup progress in `onboarding.json`. Run `/onboarding` to see
@@ -201,6 +213,9 @@ These plugins are installed during onboarding (`/onboarding` handles this automa
 ```
 [agent-name]/
   CLAUDE.md              # This file — agent identity and instructions
+  README.md              # Human-facing capabilities overview
+  ARCHITECTURE.md        # Current state — how the agent runs today
+  TARGET-ARCHITECTURE.md # Target state — where the agent is headed
   onboarding.json        # Setup progress tracker
   dashboard.yaml         # Trinity dashboard metrics
   template.yaml          # Trinity metadata
@@ -211,8 +226,9 @@ These plugins are installed during onboarding (`/onboarding` handles this automa
     skills/              # Agent capabilities (playbooks)
       [skill-1]/SKILL.md
       [skill-2]/SKILL.md
-      onboarding/SKILL.md     # Setup progress tracker
-      update-dashboard/SKILL.md  # Dashboard metrics updater
+      onboarding/SKILL.md       # Setup progress tracker
+      update-dashboard/SKILL.md # Dashboard metrics updater
+      reconcile-docs/SKILL.md   # Doc/skill/architecture coherence check
   memory/                # Persistent state (if using memory plugin)
 ```
 
@@ -226,6 +242,23 @@ artifacts:
     mode: prescriptive
     direction: source
     description: "Agent identity and behavior — single source of truth"
+
+  TARGET-ARCHITECTURE.md:
+    mode: prescriptive
+    direction: source
+    description: "Target state — where the agent is deliberately headed. Defines intent; humans own it."
+
+  ARCHITECTURE.md:
+    mode: descriptive
+    direction: target
+    sources: [CLAUDE.md, TARGET-ARCHITECTURE.md, .claude/skills, .claude/agents]
+    description: "Current state — how the agent runs today. Tracks reality; shipped target items move here."
+
+  README.md:
+    mode: descriptive
+    direction: target
+    sources: [CLAUDE.md, .claude/skills]
+    description: "Human-facing capabilities overview — derived from CLAUDE.md and the skills."
 
   onboarding.json:
     mode: descriptive
@@ -252,6 +285,11 @@ artifacts:
     description: "[what this artifact represents]"
 
 sync_skills:
+  - skill: /reconcile-docs
+    source: [CLAUDE.md, TARGET-ARCHITECTURE.md, .claude/skills, .claude/agents]
+    target: [README.md, ARCHITECTURE.md]
+    trigger: after shipping a capability, changing skills/subagents, or on a weekly schedule
+
   - skill: /[skill-name]
     source: [source artifacts]
     target: [target artifacts]
@@ -325,6 +363,8 @@ Map the agent's skills as `sync_skills` entries — each skill that produces or 
 Only include skills that make sense as automated recurring tasks. Interactive or on-demand skills should not be scheduled. Use human-readable intervals (e.g., "every 6 hours", "daily at 9am UTC") alongside cron expressions.
 
 **Always include `/update-dashboard`** with a schedule appropriate to how frequently the agent's metrics change (e.g., `*/15 * * * *` for active agents, `0 */6 * * *` for less active ones).
+
+**Always include `/reconcile-docs`** on a light cadence (e.g., weekly `0 9 * * 1`) so doc/skill/architecture drift gets surfaced regularly. Scheduled runs are report-only; the operator applies fixes interactively.
 
 ---
 
@@ -722,7 +762,206 @@ Note: On Trinity remote, the dashboard path is `/home/developer/dashboard.yaml`.
 
 ---
 
-## STEP 9: Generate Supporting Files
+## STEP 9: Generate Architecture & Capability Docs
+
+Every agent ships three living documents that, together with CLAUDE.md, give it a clear picture of *what it is*, *how it runs today*, and *where it's going*. They make the **A → B development model** explicit: `TARGET-ARCHITECTURE.md` is B, `ARCHITECTURE.md` is A, and shipping moves an item from B into A.
+
+### 9a. Generate README.md
+
+Human-facing capabilities overview — what someone sees first when they open the repo. **Descriptive** (derived from CLAUDE.md + skills). Write `[destination]/README.md`:
+
+```markdown
+# [Agent Display Name]
+
+**Role:** [one-line purpose from Step 1]
+
+[1-2 paragraph plain-language description of what the agent does and who it serves.]
+
+## Capabilities
+
+[One subsection or bullet per capability, mirroring CLAUDE.md's Core Capabilities — each pointing at the skill that delivers it.]
+
+- **[Capability 1]** — [what it does] (`/[skill-1]`)
+- **[Capability 2]** — [what it does] (`/[skill-2]`)
+
+## Getting Started
+
+```
+cd [agent-name] && claude
+/onboarding
+```
+
+See **[ARCHITECTURE.md](ARCHITECTURE.md)** for how the agent is built today and **[TARGET-ARCHITECTURE.md](TARGET-ARCHITECTURE.md)** for where it's headed.
+
+## Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/[skill-1]` | [description] |
+| `/[skill-2]` | [description] |
+| `/reconcile-docs` | Keep docs, skills, and architecture consistent |
+```
+
+### 9b. Generate ARCHITECTURE.md
+
+The *current state* — how the agent actually runs today. **Descriptive** (tracks reality). Keep it honest: only describe what exists. Write `[destination]/ARCHITECTURE.md`:
+
+```markdown
+# [Agent Display Name] Architecture (Current State)
+
+**What this is:** the agent as it actually runs today. For where it's deliberately headed, see the companion **`TARGET-ARCHITECTURE.md`**. When a target ships, it moves *out* of that doc and *into* this one.
+
+**Last updated:** [today's date]
+
+## Overview
+
+[2-3 sentences on the agent's shape — its main components and how they fit together.]
+
+## Components
+
+### Skills
+[List each skill and what it does — mirrors `.claude/skills/`.]
+
+### Subagents
+[List each subagent in `.claude/agents/`, or "None yet."]
+
+### Data & State
+[State files, memory, data directories the agent reads/writes — or "None yet."]
+
+### Schedules
+[Recurring tasks declared in template.yaml `schedules:`, or "None yet."]
+
+## Trinity Integration
+
+[How the agent deploys — template.yaml resources, MCP config — or "Local only so far."]
+```
+
+### 9c. Generate TARGET-ARCHITECTURE.md
+
+The *target state* — where the agent is deliberately going. **Prescriptive** (defines intent). Write `[destination]/TARGET-ARCHITECTURE.md`:
+
+```markdown
+# [Agent Display Name] Target Architecture
+
+**What this is:** where the agent is deliberately headed. The companion to **`ARCHITECTURE.md`** (what runs today). When something here ships, it moves *out* of this doc and *into* `ARCHITECTURE.md`.
+
+**Last updated:** [today's date]
+
+## Direction
+
+[The guiding principle(s) for this agent's evolution — what it should become and what it should never do.]
+
+## Planned Capabilities
+
+[Capabilities the agent is built toward but doesn't have yet. Derive 1-3 from Step 1d's "planned" items, the user's stated goals, or obvious next skills. Each: what it is, why it matters, and roughly what it depends on. If the agent is fully built for now, say so and leave a single "Next ideas" bullet list.]
+
+- **[Planned capability]** — [what it enables; what it depends on]
+```
+
+**Guidance:** Populate all three from the actual agent — its real skills, subagents, and the purpose from Step 1. Don't invent components that don't exist in `ARCHITECTURE.md`. If the user named capabilities beyond the 4 initial skills (Step 1d "planned capabilities"), put those in `TARGET-ARCHITECTURE.md`. Keep each doc short — they grow with the agent.
+
+---
+
+## STEP 10: Generate /reconcile-docs Skill
+
+Every agent ships a `/reconcile-docs` skill that walks the **Artifact Dependency Graph** and keeps the agent's docs honest — so CLAUDE.md, README, the architecture docs, the skills, and any subagents never silently drift apart.
+
+Write `[destination]/.claude/skills/reconcile-docs/SKILL.md`:
+
+```yaml
+---
+name: reconcile-docs
+description: Check that CLAUDE.md, README, ARCHITECTURE/TARGET-ARCHITECTURE, skills, and subagents are mutually consistent — reports drift and applies approved fixes. Run after shipping a capability or on a schedule.
+allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
+user-invocable: true
+metadata:
+  version: "1.0"
+  created: [today's date]
+  author: [agent-name]
+  changelog:
+    - "1.0: Initial version — dependency-graph-driven coherence check across docs, skills, and subagents"
+---
+```
+
+```markdown
+# Reconcile Docs
+
+> ℹ️ **First, set expectations:** before anything else, print one short line with this skill's version and its most recent change — the top entry of `metadata.changelog` above — e.g. `reconcile-docs vX.Y — recent: <summary>`. Then proceed.
+
+Keep this agent's documentation honest. This skill reads the **Artifact Dependency Graph** in `CLAUDE.md` and checks that every artifact agrees with its sources — then reports drift and, interactively, applies approved fixes.
+
+**Direction rule (from the graph):** the *source* wins.
+- **Descriptive targets** (`README.md`, `ARCHITECTURE.md`) must match reality — when they disagree with their sources (CLAUDE.md, the skills, the subagents, the code), **fix the target.**
+- **Prescriptive sources** (`CLAUDE.md`, `TARGET-ARCHITECTURE.md`) define intent — when they're out of date, **flag for a human.** Never silently rewrite intent to match a possibly-buggy implementation.
+
+## Process
+
+### Step 1: Load the graph
+
+Read `CLAUDE.md` and parse the `## Artifact Dependency Graph` (the `artifacts:` and `sync_skills:` blocks). This is the spec for what depends on what.
+
+### Step 2: Gather reality
+
+```bash
+find .claude/skills -name SKILL.md 2>/dev/null
+ls .claude/agents/*.md 2>/dev/null
+ls README.md ARCHITECTURE.md TARGET-ARCHITECTURE.md template.yaml 2>/dev/null
+```
+
+Read `README.md`, `ARCHITECTURE.md`, `TARGET-ARCHITECTURE.md`, and the `schedules:` block in `template.yaml`. Note each skill's name/description from its frontmatter and each subagent's purpose.
+
+### Step 3: Check coherence
+
+Evaluate each, recording CONSISTENT / DRIFT / MISSING:
+
+1. **CLAUDE.md ↔ skills** — every skill in `.claude/skills/` is listed in Core Capabilities; every listed skill exists; descriptions agree.
+2. **README ↔ reality** — README capabilities/skills table matches the actual skills and subagents.
+3. **ARCHITECTURE ↔ reality** — components described (skills, subagents, data, schedules) all exist on disk; nothing real is undocumented.
+4. **TARGET-ARCHITECTURE ↔ ARCHITECTURE** — no item described as shipped/live in ARCHITECTURE is still sitting in TARGET as "planned." Anything now implemented → propose moving it from target into current.
+5. **Subagents ↔ docs** — every `.claude/agents/*` is referenced in CLAUDE.md/ARCHITECTURE; nothing referenced is missing.
+6. **Schedules ↔ template.yaml** — the Recommended Schedules table in CLAUDE.md matches the `schedules:` block.
+7. **Guidelines ↔ behavior** — guidelines don't contradict what the skills actually do.
+
+### Step 4: Report
+
+Produce a drift report — **this mode is read-only and safe to run on a schedule.**
+
+```
+## Doc Reconciliation: [agent name]
+
+| # | Check | Status | Drift | Fix side |
+|---|-------|--------|-------|----------|
+| 1 | CLAUDE.md ↔ skills | DRIFT | /foo exists but isn't in Core Capabilities | target (CLAUDE.md*) |
+| 2 | ARCHITECTURE ↔ reality | DRIFT | subagent `bar` not documented | target (ARCHITECTURE.md) |
+
+\* CLAUDE.md is prescriptive — flag, don't auto-edit.
+```
+
+If everything is CONSISTENT, say so and stop.
+
+### Step 5: Apply (interactive only)
+
+**Skip this step when running on a schedule** — scheduled runs report only (no approval gate). When run interactively and drift exists, propose exact edits and confirm:
+
+Use AskUserQuestion:
+- **Question:** "Which fixes should I apply?"
+- **Header:** "Apply Fixes"
+- **Options:** Apply all (descriptive targets only) / Let me pick / Just the report
+
+Apply approved edits to **descriptive targets** (`README.md`, `ARCHITECTURE.md`) — and, when a target item has shipped, move it from `TARGET-ARCHITECTURE.md` into `ARCHITECTURE.md`. For drift that implicates a **prescriptive source** (CLAUDE.md, TARGET-ARCHITECTURE.md), present it as a recommendation for the user to decide — do not auto-edit.
+
+## Outputs
+
+- A coherence report (always)
+- Updated `README.md` / `ARCHITECTURE.md` when fixes are approved
+- Flagged recommendations for any CLAUDE.md / TARGET-ARCHITECTURE.md drift
+```
+
+**Recommend a weekly schedule** for `/reconcile-docs` in the agent's `template.yaml` (report-only cadence, e.g. `0 9 * * 1`), and add it to the Recommended Schedules table. Scheduled runs surface drift; the operator applies fixes interactively.
+
+---
+
+## STEP 11: Generate Supporting Files
 
 ### 7a. Create .env.example
 
@@ -791,7 +1030,7 @@ Write `[destination]/.mcp.json.template`:
 
 ---
 
-## STEP 10: Initialize Git
+## STEP 12: Initialize Git
 
 ```bash
 cd [destination] && git init && git add -A && git commit -m "Initial agent scaffold: [agent-name]"
@@ -799,7 +1038,7 @@ cd [destination] && git init && git add -A && git commit -m "Initial agent scaff
 
 ---
 
-## STEP 11: Create GitHub Repository
+## STEP 13: Create GitHub Repository
 
 Ask the user if they want to create a GitHub repository for this agent.
 
@@ -864,7 +1103,7 @@ Move on silently. The agent works fine without a remote.
 
 ---
 
-## STEP 12: Completion
+## STEP 14: Completion
 
 Display this to the user:
 
@@ -876,10 +1115,14 @@ Display this to the user:
 | File | Purpose |
 |------|---------|
 | `CLAUDE.md` | Agent identity and instructions |
+| `README.md` | Human-facing capabilities overview |
+| `ARCHITECTURE.md` | Current state — how the agent runs today |
+| `TARGET-ARCHITECTURE.md` | Target state — where the agent is headed |
 | `.claude/skills/[skill-1]/SKILL.md` | [skill description] |
 | `.claude/skills/[skill-2]/SKILL.md` | [skill description] |
 | `.claude/skills/onboarding/SKILL.md` | Setup progress tracker |
 | `.claude/skills/update-dashboard/SKILL.md` | Dashboard metrics updater |
+| `.claude/skills/reconcile-docs/SKILL.md` | Doc/skill/architecture coherence check |
 | `onboarding.json` | Persistent onboarding checklist |
 | `dashboard.yaml` | Trinity dashboard with domain metrics |
 | `template.yaml` | Trinity metadata |

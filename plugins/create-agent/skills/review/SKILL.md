@@ -6,10 +6,12 @@ disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Bash, Skill
 metadata:
-  version: "1.0"
+  version: "1.1"
   created: 2026-06-14
+  updated: 2026-06-18
   author: Ability.ai
   changelog:
+    - "1.1: Audit Documentation Coherence — README/ARCHITECTURE/TARGET-ARCHITECTURE present, current/target split intact, docs match skills and subagents"
     - "1.0: Initial version — read-only agent audit that hands off to /adjust-agent"
 ---
 
@@ -44,12 +46,14 @@ If `CLAUDE.md` doesn't exist, ask for the correct path.
 Read all agent artifacts (a missing one is itself a finding):
 
 1. `CLAUDE.md`
-2. `template.yaml`
-3. `.env.example`
-4. `.gitignore`
-5. `.mcp.json.template` or `.mcp.json`
-6. All `SKILL.md` files: `find .claude/skills -name "SKILL.md" 2>/dev/null`
-7. Top-level listing: `ls -la`
+2. `README.md`, `ARCHITECTURE.md`, `TARGET-ARCHITECTURE.md` (a missing one is a Documentation Coherence finding)
+3. `template.yaml`
+4. `.env.example`
+5. `.gitignore`
+6. `.mcp.json.template` or `.mcp.json`
+7. All `SKILL.md` files: `find .claude/skills -name "SKILL.md" 2>/dev/null`
+8. Any subagents: `ls .claude/agents/*.md 2>/dev/null`
+9. Top-level listing: `ls -la`
 
 If `$ARGUMENTS` names a focus area (e.g. "composition", "schedules", "trinity"), audit only that area; otherwise run the full audit.
 
@@ -133,6 +137,16 @@ Real findings:
 - No committed secrets
 - Skill directory naming convention (lowercase-with-hyphens)
 
+### 2j. Documentation Coherence
+The agent should keep an honest current→target picture and a human-facing overview.
+- `README.md` present — human-facing capabilities overview, and its skill/capability list matches the actual skills
+- `ARCHITECTURE.md` present — describes *current* state; components it names (skills, subagents, data, schedules) actually exist on disk, and nothing real is undocumented
+- `TARGET-ARCHITECTURE.md` present — describes *target* state; the current/target split is intact (no item described as shipped/live in `ARCHITECTURE.md` is still listed as "planned" in the target doc)
+- The dependency graph registers these docs with correct `mode`/`direction` (README + ARCHITECTURE descriptive targets; TARGET-ARCHITECTURE prescriptive source)
+- A `/reconcile-docs` skill exists to maintain this coherence (and ideally is scheduled)
+
+This is the *detect* counterpart to a generated agent's own `/reconcile-docs` — the agent self-checks; this audit verifies the machinery is present and the docs aren't already drifting.
+
 ---
 
 ## Step 3: Report
@@ -165,6 +179,7 @@ Produce a findings report — **no edits, no AskUserQuestion to apply anything**
 | Guidelines | … |
 | Skill Quality | … |
 | Composition Integrity | … |
+| Documentation Coherence | … |
 | Trinity Ready | … |
 | Hygiene | … |
 
@@ -189,8 +204,9 @@ This review changed nothing. To act on it:
 | 6 | Skill Docs | CLAUDE.md ↔ .claude/skills/ in sync | High |
 | 7 | Skill Quality | Frontmatter valid, permissions minimal, steps clear | High |
 | 8 | Composition Integrity | Invocations resolve, no cycles, autonomy transitive, Skill tool present | High |
-| 9 | Trinity Ready | template.yaml, .env.example, .gitignore, .mcp template | Low |
-| 10 | Hygiene | Git init, no secrets, naming convention | Low |
+| 9 | Documentation Coherence | README/ARCHITECTURE/TARGET-ARCHITECTURE present, current/target split intact, docs match skills & subagents, /reconcile-docs exists | Medium |
+| 10 | Trinity Ready | template.yaml, .env.example, .gitignore, .mcp template | Low |
+| 11 | Hygiene | Git init, no secrets, naming convention | Low |
 
 ---
 
