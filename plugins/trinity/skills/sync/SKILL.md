@@ -6,10 +6,11 @@ disable-model-invocation: true
 user-invocable: true
 allowed-tools: Bash, Read, Write, Grep, Glob, mcp__trinity__list_agents, mcp__trinity__chat_with_agent, mcp__trinity__list_operator_queue, mcp__trinity__get_operator_queue_item, mcp__trinity__list_agent_schedules, mcp__trinity__create_agent_schedule, mcp__trinity__update_agent_schedule, mcp__trinity__toggle_agent_schedule
 metadata:
-  version: "2.3.1"
+  version: "2.4.0"
   created: 2025-02-05
   author: eugene
   changelog:
+    - "2.4.0: `pull` no longer blanket-discards before fast-forwarding — it stashes uncommitted work (tracked + untracked) and pops it back, discarding only known runtime paths, and uses `git pull --ff-only`. Fixes a data-loss hazard where a scheduled pull onto the remote's autonomous-loop commits wiped uncommitted agent-value edits (skills, memory, registries) via `git checkout -- .`"
     - "2.3.1: Added the canonical Trinity MCP connection prerequisite — delegates to /trinity:connect (the single connection owner) when the mcp__trinity__* tools aren't live, consistent with /trinity:loop and /trinity:onboard"
     - "2.3.0: Unified remote registry — sync's config is now `.trinity-remote.yaml` (was `.trinity-sync.yaml`), the same file `/trinity:onboard` writes and `/trinity:loop` reads. Fixes the onboard→sync handoff (sync now resolves the agent name onboard recorded instead of re-guessing). Schema gains onboard's machine-maintained `instance`/`profile`/`deployed_at` fields; migrates legacy single-remote files in place"
     - "2.2.0: Schedule reconciliation (Phase 7) — diff template.yaml schedules: against live Trinity schedules on push/pull/deploy/status; new `schedules` subcommand to reconcile on demand"
@@ -404,11 +405,47 @@ Based on analysis, command, and target remote:
 6. Update remote's tracked branch in config
 
 **If `/trinity-sync pull` or `/trinity-sync pull @remote`:**
-1. Resolve target remote
-2. Get the remote's current branch
-3. Discard any local runtime changes: `git checkout -- .`
-4. Pull: `git pull origin <remote-branch>`
-5. Verify at same HEAD as remote
+
+⚠️ **Never blanket-discard before pulling.** `git checkout -- .` wipes *every*
+uncommitted change — including agent value (skills, memory, registries, thinking
+files) the local session has edited but not yet committed. The remote's autonomous
+loops commit those same files on a schedule, so a pull routinely lands on top of
+live local edits. `git checkout` is unrecoverable; **stash** instead, so work
+survives the pull.
+
+1. Resolve the target remote and its tracked branch.
+2. Discard ONLY known runtime paths (noise, recreated at runtime) — never a blanket checkout:
+   ```bash
+   for p in .claude/debug .claude/projects .claude/statsig .claude/todos session-files content; do
+     git checkout -- "$p" 2>/dev/null || true
+   done
+   ```
+3. Stash everything still uncommitted (tracked + untracked) so agent-value edits survive:
+   ```bash
+   STASHED=0
+   if ! git diff --quiet --ignore-submodules || \
+      ! git diff --cached --quiet --ignore-submodules || \
+      [ -n "$(git ls-files --others --exclude-standard)" ]; then
+     git stash push -u -m "trinity-sync: pre-pull autostash" && STASHED=1
+   fi
+   ```
+4. Fast-forward onto the remote branch. `--ff-only` fails cleanly if the branches
+   have diverged — no half-finished merge/rebase state, and the stash stays intact:
+   ```bash
+   git pull --ff-only origin <remote-branch>
+   ```
+5. Re-apply the stashed local edits on top of the pulled commits:
+   ```bash
+   if [ "$STASHED" = 1 ]; then
+     git stash pop || {
+       echo "⚠ Local edits overlap the pulled changes — conflict on pop."
+       echo "  Your work is preserved in the stash (git stash list). Resolve manually; nothing was lost."
+     }
+   fi
+   ```
+6. Verify at the remote's HEAD (plus any re-applied local edits). If step 4 could not
+   fast-forward, the branches have diverged — surface it as a merge decision; the stash
+   still holds the local work, so nothing is lost either way.
 
 **If both have uncommitted changes:**
 1. Compare the diffs
@@ -585,6 +622,7 @@ Both agents sync through the shared GitHub repository. GitHub is the source of t
 11. **Branches are cheap** - Use them liberally for experiments
 12. **Track branch per remote** - Each remote can track a different branch
 13. **Schedules reconcile from template.yaml** - The `schedules:` block is the source of truth; reconcile aligns live cron jobs but never toggles activation (operator's call) or deletes drift
+14. **Pull stashes, never blanket-discards** - `pull` stashes uncommitted work (tracked + untracked) before fast-forwarding and pops it back after; it only ever *discards* known runtime paths. A blanket `git checkout -- .` is forbidden — it destroys uncommitted agent value the local session hasn't committed yet, exactly what a scheduled pull lands on top of
 
 ## When to Run Sync
 
