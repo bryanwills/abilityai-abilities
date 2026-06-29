@@ -6,11 +6,12 @@ disable-model-invocation: false
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion
 metadata:
-  version: "1.3"
+  version: "1.4"
   created: 2026-04-01
-  updated: 2026-06-18
+  updated: 2026-06-29
   author: Ability.ai
   changelog:
+    - "1.4: Generated agents publish structured reports via the mcp__trinity__report tool — CLAUDE.md gains a Reporting-to-Trinity section, result-producing skills get a guarded report step, and /update-dashboard also emits a kpi_snapshot report (history alongside the live snapshot)"
     - "1.3: Scaffold ships README.md + ARCHITECTURE.md + TARGET-ARCHITECTURE.md (current→target development model) and a /reconcile-docs default skill that keeps them coherent with CLAUDE.md, skills, and subagents"
     - "1.2: Wizards emit a template.yaml schedules: block for declarative Trinity scheduling"
     - "1.1: Removed Trinity CLI references — deployment guidance is now MCP/onboard-based"
@@ -178,6 +179,18 @@ When you're ready to run this agent remotely (scheduled tasks, always-on, API ac
 After deploying, interact with your remote agent through the Trinity MCP tools available in Claude Code.
 
 Learn more at [ability.ai](https://ability.ai)
+
+### Reporting to Trinity
+
+Once deployed, publish **structured reports** so an operator can see what you produced without reading chat. At the end of any skill that yields a meaningful result — a summary, a batch of items, a metrics snapshot — call the `mcp__trinity__report` MCP tool. The report appears on this agent's **Reports** tab and the fleet-wide **Operations → Reports** view.
+
+- **When:** at the end of result-producing skills and scheduled runs — not for conversational replies.
+- **`report_type`:** namespaced `lower_snake`, shaped `<agent>.<result>` — e.g. `[agent-name].weekly_summary`, `[agent-name].items_processed`.
+- **`title`:** one short line (≤300 chars). **`payload`:** any JSON (≤256 KB).
+- **`display_hint`:** `table` (`{columns, rows}`), `kpi` (`{tiles:[{label,value,unit?}]}`), `markdown` (`{markdown}`), `timeline` (`{events:[{ts,label,detail}]}`), or omit for a raw-JSON view.
+- **Guard the call:** the tool exists only when running on Trinity (it publishes under this agent's own key). If `mcp__trinity__report` isn't available — e.g. running locally — skip it silently. **Trinity is an upgrade, not a requirement.**
+
+Reports complement `dashboard.yaml`: the dashboard is the *current* snapshot (overwritten each refresh); reports are an *append-only* history of what the agent accomplished.
 
 ## Architecture & Direction
 
@@ -450,6 +463,7 @@ metadata:
 - Use `AskUserQuestion` for any step that needs user input
 - Include specific, actionable instructions — not vague descriptions
 - Match the tools to what the skill actually needs (don't grant Write if it only reads)
+- **Publish a report on result-producing skills:** if a skill yields a surfaceable result (a summary, a batch, metrics), end it with a step that calls `mcp__trinity__report` (`report_type: <agent>.<result>`, a fitting `display_hint`) — guarded so it only fires when the tool is available on Trinity (see CLAUDE.md → *Reporting to Trinity*)
 
 **Present each skill outline to the user before creating it.** Show the name, purpose, steps, and tools. Let them adjust before you write the files.
 
@@ -742,7 +756,17 @@ Read `dashboard.yaml`, update widget values with fresh data:
 
 Write the updated `dashboard.yaml`.
 
-### Step 3: Confirm
+### Step 3: Publish a KPI snapshot report (Trinity)
+
+If the `mcp__trinity__report` tool is available (i.e. running on Trinity), also publish the same headline numbers as a report so they accumulate as history alongside the live snapshot:
+
+- `report_type`: `[agent-name].kpi_snapshot`
+- `display_hint`: `kpi`
+- `payload`: `{ "tiles": [ {"label": "...", "value": "...", "unit": "..."} ] }`, built from the same values you just wrote to the dashboard.
+
+Skip this step silently if the tool isn't available — the dashboard refresh above still succeeds.
+
+### Step 4: Confirm
 
 Report what was updated:
 ```
