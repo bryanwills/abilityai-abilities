@@ -246,6 +246,7 @@ Development tools for extending existing agents. Memory systems are copied direc
 /agent-dev:adjust-playbook              # Modify existing skill/playbook
 /agent-dev:add-memory                   # Add memory system
 /agent-dev:add-backlog                  # Add GitHub Issues workflow
+/agent-dev:add-orchestrator             # Make the agent a system-aware orchestrator
 /agent-dev:work-loop                    # Autonomous work loop
 ```
 
