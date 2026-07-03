@@ -4,10 +4,11 @@ description: Make any agent a system-aware orchestrator — installs /discover-a
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Skill
 user-invocable: true
 metadata:
-  version: "1.4"
+  version: "1.5"
   created: 2026-07-01
   author: Ability.ai
   changelog:
+    - "1.5: Adopt /fleet-reconcile into the bundle (sixth skill) — gated doc-reconciliation that folds already-verified deltas (session fixes, audit corrections_pending queues) into orchestration.md prose, dossier addenda, CLAUDE.md, and memory, then makes one focused commit; universalized from a production orchestrator (optional convention-based audit queue, memory-system-agnostic, section refs aligned to the bundle's orchestration.md template)"
     - "1.4: Integrate with /add-pipeline (the intra-agent sibling) — /discover-agents scans each repo's projects/*/pipeline.yaml into a pipelines: field per map node, /orchestrate routes pipeline-shaped work to the owning agent instead of re-sequencing its stages as a chain, /profile-fleet degrades gracefully on Trinity builds without the pipeline MCP introspection tools; cross-pointers added both ways"
     - "1.3: Adopt two fleet-maintenance skills into the bundle — /sync-fleet-to-head (non-destructively bring in-scope agents to their GitHub HEAD; pull-only clean→stash_reapply ladder, conflict gates) and /profile-fleet (interview + introspect agents, reconcile self-report vs declared config, correct orchestration.md prose behind a gate; writes fleet/agent-profiles/). Both are narrative-scoped and compose /discover-agents"
     - "1.2: Add the orchestration-narrative layer — scaffolds fleet/orchestration.md (hybrid: human prose + tool-refreshed roster/topology blocks) as the standard home for the who-calls-whom-and-why intent, imports it into CLAUDE.md via @fleet/orchestration.md so it loads at session start; /discover-agents refreshes its roster+topology from live agent_permissions, /compose-system sources agent_permissions from its §5, /orchestrate routes by its edges/patterns"
@@ -40,6 +41,7 @@ Artifacts (four layers):
 Maintenance (keep the fleet + its narrative honest over time):
   /sync-fleet-to-head   non-destructively bring in-scope agents to their GitHub HEAD
   /profile-fleet        interview + introspect agents, reconcile reality, correct orchestration.md
+  /fleet-reconcile      fold already-verified deltas into every doc surface — no new evidence, one gate
 ```
 
 **Design invariant (do not violate):** orchestration is **agent-owned**. Trinity supplies the substrate (shared folders, agent-to-agent permissions, MCP messaging, cron) but runs **no central DAG engine**. So the roll-out → work → tear-down lifecycle lives *inside* `/orchestrate` — stitched from existing MCP calls — never as a new platform primitive. The multi-agent *definition* aligns 1:1 with Trinity's `SystemManifest` (the same YAML `deploy_system` consumes); this skill does **not** invent a competing format.
@@ -55,6 +57,7 @@ Maintenance (keep the fleet + its narrative honest over time):
 | `.claude/skills/orchestrate/SKILL.md` | agent repo | route / fan out / ephemeral, via Trinity MCP |
 | `.claude/skills/sync-fleet-to-head/SKILL.md` | agent repo | non-destructively bring in-scope agents to their GitHub HEAD (fleet git hygiene) |
 | `.claude/skills/profile-fleet/SKILL.md` | agent repo | interview + introspect agents; reconcile reality and correct the `orchestration.md` narrative |
+| `.claude/skills/fleet-reconcile/SKILL.md` | agent repo | fold already-verified deltas into the doc surfaces (narrative, dossiers, CLAUDE.md, memory) behind one gate — no new evidence |
 | `fleet/sources.yaml` | agent repo | the repo list you edit (local paths + `github:Org/repo`) |
 | `fleet/system-map.yaml` | agent repo | descriptive FACTS/nodes registry (written by `/discover-agents`) |
 | `fleet/orchestration.md` | agent repo | design NARRATIVE — edges, permission intent, patterns; imported into CLAUDE.md, loads at session start (human prose + tool-refreshed blocks) |
@@ -91,7 +94,7 @@ Trinity MCP is **not** required to install — `/discover-agents` and `/compose-
 Use `AskUserQuestion`:
 
 **Q1 — Which skills to install?**
-- `All five` (discover-agents, compose-system, orchestrate, sync-fleet-to-head, profile-fleet) — recommended
+- `All six` (discover-agents, compose-system, orchestrate, sync-fleet-to-head, profile-fleet, fleet-reconcile) — recommended
 - `Core three` (discover-agents, compose-system, orchestrate) — the discover → compose → route trio, without the fleet-maintenance skills
 - `Discovery only` (discover-agents) — just build the system map; wire the rest later
 
@@ -127,7 +130,7 @@ If the user pasted repos in Q2, append them under `repos:` in `fleet/sources.yam
 For each skill selected in Q1, copy its template. The templates are ready to use as-is — **no placeholder substitution** (they read `fleet/sources.yaml` / `fleet/system-map.yaml` at runtime and infer the agent name themselves):
 
 ```bash
-for skill in discover-agents compose-system orchestrate sync-fleet-to-head profile-fleet; do
+for skill in discover-agents compose-system orchestrate sync-fleet-to-head profile-fleet fleet-reconcile; do
   # skip any the user didn't select in Q1
   is_selected "$skill" || continue
   mkdir -p ".claude/skills/$skill"
@@ -213,6 +216,7 @@ Print:
 - /orchestrate        → route / fan out / run ephemeral, via Trinity MCP
 - /sync-fleet-to-head → non-destructively bring in-scope agents to their GitHub HEAD
 - /profile-fleet      → interview + introspect agents, correct the orchestration.md narrative
+- /fleet-reconcile    → fold already-verified deltas into the doc surfaces — no new evidence
 
 ### Files
 - fleet/sources.yaml       (edit this — your repo list)
@@ -231,7 +235,7 @@ Print:
    Fleet already on Trinity? You're done — skip to step 5.
 4. /compose-system             — (provisioning NEW agents only) derive agent_permissions from §5, dry-run, deploy.
 5. /orchestrate <task>         — put the fleet to work (routes by the map + orchestration.md).
-6. Keep it honest over time     — /sync-fleet-to-head (agents on latest code) and /profile-fleet (narrative matches reality).
+6. Keep it honest over time     — /sync-fleet-to-head (agents on latest code), /profile-fleet (narrative matches reality), /fleet-reconcile (fold verified deltas into the docs cheaply).
 ```
 
 ---

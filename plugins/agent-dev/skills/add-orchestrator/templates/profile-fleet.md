@@ -7,10 +7,11 @@ allowed-tools: Read, Grep, Write, Edit, Bash, Skill, AskUserQuestion, mcp__trini
 effort: high
 user-invocable: true
 metadata:
-  version: "1.1"
+  version: "1.2"
   created: 2026-07-01
   author: orchestrator
   changelog:
+    - "1.2: Point to /fleet-reconcile as the cheap sibling — folding already-verified deltas into the narrative without new interviews; this playbook is the evidence generator"
     - "1.1: Pipeline introspection degrades gracefully — list_agent_pipelines/get_agent_pipeline_state are not on every Trinity build; when absent, fall back to the map's pipelines: field (repo projects/*/pipeline.yaml via /discover-agents), the shared ~/.trinity/pipeline-state/ read surface when visible, and interview Q3"
     - "1.0: Initial version — narrative-scoped fleet interview + introspection; declared-vs-self-reported reconciliation; proposes orchestration.md prose edits behind a diff gate; per-agent dossiers in fleet/agent-profiles/ as checkpoints + evidence"
 ---
@@ -163,6 +164,7 @@ Apply approved edits to `fleet/orchestration.md` (prose only). Report:
 - **Three sources, one truth.** Self-report says *intent*, config says *capability*, activity says *reality*. Weight reality highest; an agent that claims a workflow with no matching schedule/skill/activity is aspirational.
 - **Profiles describe deployed code.** Results reflect whatever is currently running — run `/sync-fleet-to-head` first for an at-HEAD picture.
 - **Narrative, not enforcement.** This playbook only edits `orchestration.md`. Turning §5 intent into enforced `agent_permissions` is `/compose-system`; reconciling §4 edges against real call history is a separate companion step, not part of this bundle.
+- **The cheap sibling.** When the deltas are *already verified* (a fix applied this session, an audit's findings) the docs don't need a re-interview — `/fleet-reconcile` folds them into the narrative, dossier addenda, CLAUDE.md, and memory behind one gate, at zero agent compute. Reach for this playbook only when the evidence itself is stale.
 - **The self-reference:** if this orchestrator is itself in the fleet (often deployed under a different name), profiling it is self-introspection — describe it from what you know rather than interviewing yourself in a loop.
 
 ## Self-Improvement

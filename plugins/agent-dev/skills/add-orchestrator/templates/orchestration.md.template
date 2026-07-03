@@ -69,4 +69,6 @@ When does the system stop and ask a human? Who is the operator? Where do approva
 - Regenerate the manifest from §5 intent: `/compose-system`.
 - Bring deployed agents to their GitHub HEAD (non-destructive, pull-only): `/sync-fleet-to-head`.
 - Re-interview agents & correct this narrative against reality: `/profile-fleet`.
+- Fold already-verified deltas (fixes applied, audit corrections) into this narrative
+  and the other doc surfaces without new interviews: `/fleet-reconcile`.
 - **Last reviewed:** {{DATE}}

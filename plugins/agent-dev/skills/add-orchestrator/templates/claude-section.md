@@ -30,6 +30,7 @@ Deployed agents are called by their live `deployed_name` from the map (matched r
 | `/orchestrate` | Read the map + orchestration.md + live Trinity MCP to route a task to the best-fit agent, `fan_out` across many, or run an ephemeral agent |
 | `/sync-fleet-to-head` | Non-destructively bring in-scope agents to their GitHub HEAD (pull-only ladder, conflict gates) — fleet git hygiene |
 | `/profile-fleet` | Interview + introspect agents, reconcile reality vs the narrative, and correct this file's prose behind a gate |
+| `/fleet-reconcile` | Fold already-verified deltas (session fixes, audit queues) into the doc surfaces — narrative, dossiers, CLAUDE.md, memory — behind one gate; generates no new evidence |
 
 **Loaded at session start (design narrative):**
 @fleet/orchestration.md
