@@ -31,6 +31,8 @@ Deployed agents are called by their live `deployed_name` from the map (matched r
 | `/sync-fleet-to-head` | Non-destructively bring in-scope agents to their GitHub HEAD (pull-only ladder, conflict gates) — fleet git hygiene |
 | `/profile-fleet` | Interview + introspect agents, reconcile reality vs the narrative, and correct this file's prose behind a gate |
 | `/fleet-reconcile` | Fold already-verified deltas (session fixes, audit queues) into the doc surfaces — narrative, dossiers, CLAUDE.md, memory — behind one gate; generates no new evidence |
+| `/project-init` (opt-in layer) | Create or adopt a managed project — epic issue + workspace — per `fleet/project-standard.md` |
+| `/project-steward` (opt-in layer) | Autonomous sweep of managed projects: reconcile dispatches, dispatch next work to explicitly-labeled owners, escalate stalls, daily digest — never asks mid-run |
 
 **Loaded at session start (design narrative):**
 @fleet/orchestration.md

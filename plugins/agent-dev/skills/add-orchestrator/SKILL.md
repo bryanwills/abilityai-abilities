@@ -4,10 +4,11 @@ description: Make any agent a system-aware orchestrator — installs /discover-a
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, AskUserQuestion, Skill
 user-invocable: true
 metadata:
-  version: "1.6"
+  version: "1.7"
   created: 2026-07-01
   author: Ability.ai
   changelog:
+    - "1.7: Adopt the project-management layer (opt-in Q3) — /project-init + /project-steward (autonomous driver, from a production orchestrator's field-hardened v1.6) + a fleet/project-standard.md template; registry repo, operator, and cadence parameterized at install; steward schedule recorded in template.yaml schedules:; dispatches resolve owners via the map's deployed_name and respect orchestration.md §5; deliberately does NOT compose /orchestrate (transitive autonomy — its interactive disambiguation would hang an unattended run)"
     - "1.6: Internalize the production orchestrator's profile-fleet field lesson — §3 role corrections route to a §3a prose subsection (the §3 roster is GENERATED and must not be hand-edited); orchestration.md.template now ships the §3a stub; fleet-reconcile references it; /align-agent-permissions referenced when installed"
     - "1.5: Adopt /fleet-reconcile into the bundle (sixth skill) — gated doc-reconciliation that folds already-verified deltas (session fixes, audit corrections_pending queues) into orchestration.md prose, dossier addenda, CLAUDE.md, and memory, then makes one focused commit; universalized from a production orchestrator (optional convention-based audit queue, memory-system-agnostic, section refs aligned to the bundle's orchestration.md template)"
     - "1.4: Integrate with /add-pipeline (the intra-agent sibling) — /discover-agents scans each repo's projects/*/pipeline.yaml into a pipelines: field per map node, /orchestrate routes pipeline-shaped work to the owning agent instead of re-sequencing its stages as a chain, /profile-fleet degrades gracefully on Trinity builds without the pipeline MCP introspection tools; cross-pointers added both ways"
@@ -43,6 +44,11 @@ Maintenance (keep the fleet + its narrative honest over time):
   /sync-fleet-to-head   non-destructively bring in-scope agents to their GitHub HEAD
   /profile-fleet        interview + introspect agents, reconcile reality, correct orchestration.md
   /fleet-reconcile      fold already-verified deltas into every doc surface — no new evidence, one gate
+
+Drive (opt-in project-management layer — Q3 at install):
+  /project-init         create/adopt a managed project (epic + workspace) per fleet/project-standard.md
+  /project-steward      autonomous sweep: reconcile dispatches, dispatch next work to labeled owners,
+                        escalate stalls, write a daily digest — never asks mid-run
 ```
 
 **Design invariant (do not violate):** orchestration is **agent-owned**. Trinity supplies the substrate (shared folders, agent-to-agent permissions, MCP messaging, cron) but runs **no central DAG engine**. So the roll-out → work → tear-down lifecycle lives *inside* `/orchestrate` — stitched from existing MCP calls — never as a new platform primitive. The multi-agent *definition* aligns 1:1 with Trinity's `SystemManifest` (the same YAML `deploy_system` consumes); this skill does **not** invent a competing format.
@@ -59,6 +65,10 @@ Maintenance (keep the fleet + its narrative honest over time):
 | `.claude/skills/sync-fleet-to-head/SKILL.md` | agent repo | non-destructively bring in-scope agents to their GitHub HEAD (fleet git hygiene) |
 | `.claude/skills/profile-fleet/SKILL.md` | agent repo | interview + introspect agents; reconcile reality and correct the `orchestration.md` narrative |
 | `.claude/skills/fleet-reconcile/SKILL.md` | agent repo | fold already-verified deltas into the doc surfaces (narrative, dossiers, CLAUDE.md, memory) behind one gate — no new evidence |
+| `.claude/skills/project-init/SKILL.md` | agent repo (opt-in, Q3) | create/adopt a managed project per the standard |
+| `.claude/skills/project-steward/SKILL.md` | agent repo (opt-in, Q3) | autonomous project driver — sweep, dispatch, escalate, digest |
+| `fleet/project-standard.md` | agent repo (opt-in, Q3) | project-management conventions both skills read at runtime — registry repo, labels, comment formats, dispatch protocol |
+| steward schedule | `template.yaml` `schedules:` + Trinity MCP (opt-in, Q3) | `project-steward-sweep`, default cron `0 7-19/2 * * 1-5` |
 | `fleet/sources.yaml` | agent repo | the repo list you edit (local paths + `github:Org/repo`) |
 | `fleet/system-map.yaml` | agent repo | descriptive FACTS/nodes registry (written by `/discover-agents`) |
 | `fleet/orchestration.md` | agent repo | design NARRATIVE — edges, permission intent, patterns; imported into CLAUDE.md, loads at session start (human prose + tool-refreshed blocks) |
@@ -104,6 +114,13 @@ If any target skill directory already exists under `.claude/skills/`, ask per-sk
 **Q2 — Seed `fleet/sources.yaml` with the current repo list?** (free text, optional)
 - Offer to paste an initial list of repositories now (local paths and/or `github:Org/repo`), or start with the commented example and edit later.
 
+**Q3 — Add the project-management layer?** (opt-in — this installs an *autonomous, scheduled* driver, so it is never bundled silently)
+- `No` — skip; re-run this skill later to add it.
+- `Yes` — install `/project-init` + `/project-steward` and seed `fleet/project-standard.md`. Then gather three parameters:
+  - **Registry repo** — which GitHub repo hosts the project epics (default: this agent's own origin repo).
+  - **Operator** — the human name `status:needs-operator` escalates to.
+  - **Steward cadence** — cron for the sweep (default `0 7-19/2 * * 1-5`, i.e. every 2h during working hours, weekdays, server-local time).
+
 ### Step 3: Scaffold the fleet directory
 
 ```bash
@@ -126,6 +143,19 @@ fi
 
 If the user pasted repos in Q2, append them under `repos:` in `fleet/sources.yaml` (one entry per line, preserving the header comments).
 
+If the project layer was selected in Q3, also seed the standard and the steward's state dirs (never clobber an existing standard — it is live fleet configuration):
+
+```bash
+if [ ! -f fleet/project-standard.md ]; then
+  sed -e "s|{{REGISTRY_REPO}}|$REGISTRY_REPO|g" -e "s|{{OPERATOR}}|$OPERATOR|g" \
+      -e "s|{{AGENT_NAME}}|$AGENT_NAME|g" -e "s|{{DATE}}|$(date -u +%Y-%m-%d)|g" \
+      "$SKILL_DIR/templates/project-standard.md.template" > fleet/project-standard.md
+fi
+mkdir -p fleet/project-steward/digests fleet/project-steward/outputs
+```
+
+(`$AGENT_NAME` = this agent's logical name — `name:` from `template.yaml`, else the CLAUDE.md agent name. Label creation in the registry repo is NOT done here — `/project-init` creates the taxonomy idempotently on first use.)
+
 ### Step 4: Copy the selected runtime skills
 
 For each skill selected in Q1, copy its template. The templates are ready to use as-is — **no placeholder substitution** (they read `fleet/sources.yaml` / `fleet/system-map.yaml` at runtime and infer the agent name themselves):
@@ -137,6 +167,14 @@ for skill in discover-agents compose-system orchestrate sync-fleet-to-head profi
   mkdir -p ".claude/skills/$skill"
   cp "$SKILL_DIR/templates/$skill.md" ".claude/skills/$skill/SKILL.md"
 done
+
+# Project layer (Q3) — same copy pattern, same overwrite prompt rules
+if project_layer_selected; then
+  for skill in project-init project-steward; do
+    mkdir -p ".claude/skills/$skill"
+    cp "$SKILL_DIR/templates/$skill.md" ".claude/skills/$skill/SKILL.md"
+  done
+fi
 ```
 
 ### Step 5: Wire CLAUDE.md
@@ -194,6 +232,22 @@ else
 fi
 ```
 
+### Step 7b: Steward schedule (project layer only)
+
+Skip unless Q3 selected the project layer. The steward is autonomous — it needs its schedule wired, and the schedule must be durable and discoverable, not live-only:
+
+1. **Record it in `template.yaml`'s `schedules:` block** (grep-guard on `project-steward-sweep` so re-runs never duplicate). This is the source of truth `/trinity:sync` reconciles and `/discover-agents` reads:
+   ```yaml
+   - id: project-steward-sweep
+     name: Project steward sweep
+     cron: "<from Q3, default 0 7-19/2 * * 1-5>"
+     message: "Run /project-steward"
+     purpose: Sweep fleet-managed projects — reconcile dispatches, dispatch next work, escalate, digest
+     enabled: true
+   ```
+2. **If Trinity MCP is available**, install the live schedule via `create_agent_schedule` (`schedule_name: "project-steward-sweep"`). If not, print that the steward works locally when invoked manually and the schedule will be reconciled by `/trinity:onboard` / `/trinity:sync` later.
+3. If `template.yaml` is absent, warn: the schedule exists live-only (invisible to `/trinity:sync` and fleet discovery) — same caveat as `/add-pipeline`.
+
 ### Step 8: First scan (advisory)
 
 If `fleet/sources.yaml` has at least one real (non-comment) entry and `/discover-agents` was installed, invoke it once to produce an initial `fleet/system-map.yaml` — call the skill by name, don't reimplement it:
@@ -218,11 +272,14 @@ Print:
 - /sync-fleet-to-head → non-destructively bring in-scope agents to their GitHub HEAD
 - /profile-fleet      → interview + introspect agents, correct the orchestration.md narrative
 - /fleet-reconcile    → fold already-verified deltas into the doc surfaces — no new evidence
+- /project-init       → create/adopt a managed project (epic + workspace)   [if Q3 = yes]
+- /project-steward    → autonomous project driver — sweep, dispatch, digest [if Q3 = yes]
 
 ### Files
 - fleet/sources.yaml       (edit this — your repo list)
 - fleet/system-map.yaml    (FACTS/nodes — <generated | empty until first scan>)
 - fleet/orchestration.md   (NARRATIVE/intent — author §4–§7; imported into CLAUDE.md)
+- fleet/project-standard.md (project-management conventions | not installed — Q3 skipped)
 - CLAUDE.md                (Orchestration section + @fleet/orchestration.md import added)
 - dashboard.yaml           (fleet panel added | no dashboard.yaml)
 
@@ -237,6 +294,7 @@ Print:
 4. /compose-system             — (provisioning NEW agents only) derive agent_permissions from §5, dry-run, deploy.
 5. /orchestrate <task>         — put the fleet to work (routes by the map + orchestration.md).
 6. Keep it honest over time     — /sync-fleet-to-head (agents on latest code), /profile-fleet (narrative matches reality), /fleet-reconcile (fold verified deltas into the docs cheaply).
+7. (Project layer) /project-init <name> — bring the first project under management; the steward sweeps it on schedule.
 ```
 
 ---
